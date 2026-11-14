@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from opal_look_yolo.config import Settings
 from opal_look_yolo.engines import EngineRegistry
 from opal_look_yolo.main import create_app
-from opal_look_yolo.models import ModelRepository
+from opal_look_yolo.models import ModelRepository, ModelRuntime
 from opal_look_yolo.services.hardware import HardwareProvider
 
 
@@ -22,6 +22,7 @@ def make_client() -> Callable[..., TestClient]:
         engine_registry: EngineRegistry | None = None,
         hardware_provider: HardwareProvider | None = None,
         model_repository: ModelRepository | None = None,
+        model_runtime: ModelRuntime | None = None,
     ) -> TestClient:
         settings = Settings(auth_disabled=auth_disabled, auth_token=auth_token)
         app = create_app(
@@ -30,6 +31,7 @@ def make_client() -> Callable[..., TestClient]:
             engine_registry=engine_registry,
             hardware_provider=hardware_provider,
             model_repository=model_repository,
+            model_runtime=model_runtime,
         )
         return TestClient(app)
 

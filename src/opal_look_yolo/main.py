@@ -10,7 +10,12 @@ from opal_look_yolo.engines import EngineRegistry, UltralyticsYoloEngine
 from opal_look_yolo.errors import register_exception_handlers
 from opal_look_yolo.middleware.auth import require_bearer_auth
 from opal_look_yolo.middleware.correlation import CorrelationMiddleware
-from opal_look_yolo.models import LocalModelRepository, ModelRepository
+from opal_look_yolo.models import (
+    EngineModelRuntime,
+    LocalModelRepository,
+    ModelRepository,
+    ModelRuntime,
+)
 from opal_look_yolo.services.hardware import (
     HardwareProvider,
     HardwareService,
@@ -25,6 +30,7 @@ def create_app(
     engine_registry: EngineRegistry | None = None,
     hardware_provider: HardwareProvider | None = None,
     model_repository: ModelRepository | None = None,
+    model_runtime: ModelRuntime | None = None,
 ) -> FastAPI:
     resolved_settings = settings or Settings()
     app = FastAPI(
@@ -36,11 +42,16 @@ def create_app(
     resolved_registry = engine_registry or EngineRegistry([UltralyticsYoloEngine()])
     resolved_hardware = HardwareService(hardware_provider or LocalHardwareProvider())
     resolved_models = model_repository or LocalModelRepository(resolved_settings.model_dirs)
+    resolved_runtime = model_runtime or EngineModelRuntime.from_registry(resolved_registry)
 
     app.state.settings = resolved_settings
     app.state.engine_registry = resolved_registry
     app.state.hardware_service = resolved_hardware
-    app.state.model_service = ModelService(resolved_models)
+    app.state.model_service = ModelService(
+        resolved_models,
+        resolved_runtime,
+        resolved_hardware,
+    )
     app.state.engine_probe = engine_probe or (
         lambda: resolved_registry.describe("yolo").available
     )
