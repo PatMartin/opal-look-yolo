@@ -34,4 +34,9 @@ async def show_engine(engine_id: str, request: Request) -> Engine:
     responses=_RESPONSES,
 )
 async def engine_capabilities(engine_id: str, request: Request) -> Capabilities:
-    return request.app.state.engine_registry.capabilities(engine_id)
+    devices = [
+        device.device_id
+        for device in request.app.state.hardware_service.list_devices()
+        if device.available
+    ]
+    return request.app.state.engine_registry.capabilities(engine_id, devices)
