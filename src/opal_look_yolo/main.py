@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, FastAPI
 
-from opal_look_yolo.api.routes import engines, hardware, info, models
+from opal_look_yolo.api.routes import engines, hardware, info, models, predict
 from opal_look_yolo.config import Settings
 from opal_look_yolo.engines import EngineRegistry, UltralyticsYoloEngine
 from opal_look_yolo.errors import register_exception_handlers
@@ -76,6 +76,7 @@ def create_app(
     api.include_router(engines.router)
     api.include_router(hardware.router)
     api.include_router(models.router)
+    api.include_router(predict.router)
     app.include_router(api)
     return app
 
