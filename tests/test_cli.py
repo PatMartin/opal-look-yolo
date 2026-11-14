@@ -142,3 +142,42 @@ def test_connection_failure_is_reported_as_json():
 
     assert result.exit_code == 1
     assert json.loads(result.stdout)["error"]["code"] == "connection_failed"
+
+
+def test_tree_renders_live_command_tree():
+    result = CliRunner().invoke(create_cli_app(), ["tree"])
+
+    assert result.exit_code == 0, result.output
+    output = result.output
+    assert output.splitlines()[0].startswith("opal-yolo")
+    for command in (
+        "info",
+        "engines",
+        "models",
+        "hardware",
+        "predict",
+        "predict-frame",
+        "tree",
+    ):
+        assert command in output
+    assert "source" in output
+    assert "[--model-id]" not in output
+    assert "--model-id" in output
+    assert "--help" not in output
+    assert "--install-completion" not in output
+    assert "\x1b[" not in output
+
+
+def test_tree_ascii_variant():
+    result = CliRunner().invoke(create_cli_app(), ["tree", "--ascii"])
+
+    assert result.exit_code == 0, result.output
+    output = result.output
+    assert output.splitlines()[0].startswith("opal-yolo")
+    assert "|-- " in output
+    assert "`-- " in output
+    assert "├──" not in output
+    assert "└──" not in output
+    assert "│" not in output
+    assert "\x1b[" not in output
+    output.encode("ascii")

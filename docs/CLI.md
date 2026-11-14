@@ -1,0 +1,535 @@
+# OPAL Look YOLO CLI
+
+`opal-yolo` is the command-line client for the OPAL Look YOLO adapter. It is a
+Typer application that communicates with the service only through the public
+REST API. It does not import or invoke the inference service implementation
+locally.
+
+Use the CLI to inspect service health, discover engines and hardware, manage
+model lifecycle, run synchronous image predictions, submit frame envelopes, and
+inspect the complete command tree.
+
+## Installation
+
+Install the package and its CLI entry point:
+
+```bash
+python -m pip install -e .
+```
+
+Optional real Ultralytics inference is a service-side dependency and is not
+required by the CLI itself:
+
+```bash
+python -m pip install -e ".[yolo]"
+```
+
+Verify the entry point:
+
+```bash
+opal-yolo --help
+opal-yolo tree
+```
+
+## Global configuration
+
+Global options must appear before the command group or command:
+
+```bash
+opal-yolo --url http://127.0.0.1:8086 --token "$TOKEN" info show
+```
+
+| Option | Environment variable | Default | Purpose |
+|---|---|---|---|
+| `--url` | `OPAL_YOLO_URL` | `http://127.0.0.1:8086` | Base URL of the YOLO adapter |
+| `--token` | `OPAL_YOLO_TOKEN` | unset | Bearer token sent as `Authorization: Bearer ...` |
+| `--install-completion` | — | — | Install shell completion |
+| `--show-completion` | — | — | Print shell completion script |
+
+Command-line options take precedence over environment variables. If the service
+is in loopback development mode with authentication disabled, omit `--token`.
+
+The CLI always sends an absolute HTTP request to `{url}/api/v1/...` and never
+places the bearer token in a query string or request payload.
+
+## Output and exit behavior
+
+Successful commands print formatted JSON to standard output.
+
+```json
+{
+  "engine_id": "yolo",
+  "available": true,
+  "tasks": [
+    "detect"
+  ]
+}
+```
+
+API and transport failures also print a JSON object to standard output and exit
+with status `1`. The service's `OpalError` envelope is preserved when present:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Model not found",
+    "details": {
+      "model_id": "missing"
+    }
+  }
+}
+```
+
+Connection failures use a local error envelope:
+
+```json
+{
+  "error": {
+    "code": "connection_failed",
+    "message": "..."
+  }
+}
+```
+
+Typer usage errors, such as a missing required option or an invalid
+`--confidence` range, are reported by the command parser and normally use exit
+status `2`.
+
+## Command tree
+
+```text
+opal-yolo [--url] [--token]
+├── predict source --model-id [--confidence] [--device] [--engine-options]
+│   [--include-native]
+├── predict-frame --image --frame --model-id [--confidence] [--device]
+│   [--engine-options] [--include-native]
+├── tree [--ascii]
+├── info
+│   ├── show
+│   └── health
+├── engines
+│   ├── list
+│   ├── discover
+│   ├── show [engine_id]
+│   └── capabilities [engine_id]
+├── models
+│   ├── list
+│   ├── show model_id
+│   ├── load model_id [--device]
+│   └── unload model_id
+└── hardware
+    ├── list
+    └── show device_id
+```
+
+The `tree` output is generated from the live Typer/Click application, so it
+reflects the installed CLI rather than a hand-maintained command list.
+Required arguments and options are unbracketed; optional parameters are shown
+in brackets.
+
+## Command reference
+
+### `info`
+
+Service metadata and readiness.
+
+```bash
+opal-yolo info show
+opal-yolo info health
+```
+
+- `show` calls `GET /api/v1/info/`.
+- `health` calls `GET /api/v1/health/`.
+
+### `engines`
+
+Engine catalog, discovery, details, and advertised capability schema.
+
+```bash
+opal-yolo engines list
+opal-yolo engines discover
+opal-yolo engines show [engine_id]
+opal-yolo engines capabilities [engine_id]
+```
+
+`engine_id` defaults to `yolo`. Capabilities include the JSON Schema used by
+the service to validate `engine_options`.
+
+### `hardware`
+
+Local compute-device catalog.
+
+```bash
+opal-yolo hardware list
+opal-yolo hardware show DEVICE_ID
+```
+
+Typical device IDs include `cpu`, `cuda:0`, or another engine-local identifier
+reported by `hardware list`.
+
+### `models`
+
+Local model catalog and lifecycle operations.
+
+```bash
+opal-yolo models list
+opal-yolo models show MODEL_ID
+opal-yolo models load MODEL_ID [--device DEVICE_ID]
+opal-yolo models unload MODEL_ID
+```
+
+- `load` sends `{}` by default and `{"device": "..."}` when `--device` is supplied.
+- Loading is repeat-safe: loading an already loaded model returns its current
+  state.
+- `unload` does not delete model files.
+- Unloading while predictions are active can return `409 conflict`.
+
+### `predict`
+
+Run a synchronous prediction against a service-accessible image source.
+
+```bash
+opal-yolo predict SOURCE \
+  --model-id MODEL_ID \
+  [--confidence 0.25] \
+  [--device DEVICE_ID] \
+  [--engine-options JSON] \
+  [--include-native]
+```
+
+`SOURCE` is passed through to the service. Local filesystem paths and `file://`
+URIs work by default. HTTP(S) sources are available only when the service is
+configured with `OPAL_YOLO_ALLOW_REMOTE_SOURCES=true` and the remote host is in
+`OPAL_YOLO_ALLOWED_REMOTE_HOSTS`.
+
+`--confidence` must be between `0.0` and `1.0`, inclusive.
+
+`--engine-options` must be a JSON object encoded as one command-line argument.
+Allowed names and value constraints are defined by `engines capabilities`.
+
+`--include-native` asks the engine to return sanitized engine-native output in
+addition to normalized detections.
+
+### `predict-frame`
+
+Submit one JPEG or PNG frame plus a frame metadata envelope.
+
+```bash
+opal-yolo predict-frame \
+  --image frame.png \
+  --model-id MODEL_ID \
+  --frame FRAME_JSON \
+  [--confidence 0.25] \
+  [--device DEVICE_ID] \
+  [--engine-options JSON] \
+  [--include-native]
+```
+
+`--image` must point to a readable local file. The CLI sends `image/png` for a
+`.png` suffix and `image/jpeg` for other suffixes.
+
+`--frame` must be a JSON object matching the contract's `FrameEnvelope`:
+
+```json
+{
+  "stream_id": "camera-1",
+  "frame_id": "00042",
+  "sequence": 42,
+  "captured_at": "2025-01-01T12:00:00Z",
+  "image": {
+    "width": 640,
+    "height": 480
+  },
+  "transaction_id": "optional-correlation-id",
+  "request_id": "optional-request-id",
+  "causation_id": "optional-causation-id"
+}
+```
+
+Additional envelope properties are allowed and are echoed by the service. The
+`image.width` and `image.height` values must match the decoded uploaded image.
+The service does not acquire RTSP frames; OPAL Look or another caller supplies
+each frame explicitly.
+
+## JSON quoting
+
+JSON strings require shell-appropriate quoting.
+
+POSIX shell:
+
+```bash
+opal-yolo predict image.png --model-id yolov8n \
+  --engine-options '{"imgsz": 640, "half": false}'
+```
+
+PowerShell:
+
+```powershell
+opal-yolo predict image.png --model-id yolov8n `
+  --engine-options '{\"imgsz\": 640, \"half\": false}'
+```
+
+For complex frame envelopes, storing the JSON in a file and reading it into a
+shell variable can be easier to maintain. The current CLI expects the frame
+envelope itself as a string; it does not accept a JSON file path for `--frame`.
+
+## Authentication behavior
+
+When service authentication is enabled, provide a token globally or through the
+environment:
+
+```bash
+opal-yolo --url https://yolo.example --token "$TOKEN" models list
+# or
+export OPAL_YOLO_URL=https://yolo.example
+export OPAL_YOLO_TOKEN="$TOKEN"
+opal-yolo models list
+```
+
+Missing or invalid credentials produce the service's `unauthorized` error
+envelope and exit status `1`. When the service is explicitly configured for
+loopback development without authentication, omit the token.
+
+## COOKBOOK
+
+### Recipe 1 — Show adapter metadata
+
+```bash
+opal-yolo info show
+```
+
+Expected output contains `name`, `version`, and `engine_id`.
+
+### Recipe 2 — Check health before submitting work
+
+```bash
+opal-yolo info health
+```
+
+Use this in scripts before loading a model or predicting. A `503` response is
+reported as JSON with a nonzero exit code.
+
+### Recipe 3 — Configure a reusable endpoint and token
+
+```bash
+export OPAL_YOLO_URL=http://127.0.0.1:8086
+export OPAL_YOLO_TOKEN='local-token'
+opal-yolo info show
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:OPAL_YOLO_URL = 'http://127.0.0.1:8086'
+$env:OPAL_YOLO_TOKEN = 'local-token'
+opal-yolo info show
+```
+
+### Recipe 4 — Print the complete CLI tree
+
+```bash
+opal-yolo tree
+```
+
+Use this to discover commands and required parameters on the installed version.
+
+### Recipe 5 — Print a log-safe ASCII CLI tree
+
+```bash
+opal-yolo tree --ascii
+```
+
+This avoids Unicode box-drawing characters and terminal styling.
+
+### Recipe 6 — List known engines
+
+```bash
+opal-yolo engines list
+```
+
+The response is an array of `Engine` objects with availability, tasks, version,
+and optional capability metadata.
+
+### Recipe 7 — Refresh engine availability
+
+```bash
+opal-yolo engines discover
+```
+
+Discovery refreshes installed-engine availability without installing software,
+downloading weights, or changing persistent configuration.
+
+### Recipe 8 — Inspect the YOLO engine
+
+```bash
+opal-yolo engines show yolo
+```
+
+The `yolo` argument may be omitted because it is the default.
+
+### Recipe 9 — Read valid engine options
+
+```bash
+opal-yolo engines capabilities yolo
+```
+
+Use `options_schema` to determine which `--engine-options` properties are
+valid for the current engine.
+
+### Recipe 10 — List compute devices
+
+```bash
+opal-yolo hardware list
+```
+
+Record a suitable `device_id` before selecting a device explicitly.
+
+### Recipe 11 — Inspect a compute device
+
+```bash
+opal-yolo hardware show cpu
+```
+
+Replace `cpu` with an ID returned by `hardware list`, such as `cuda:0` when a
+CUDA device is detected.
+
+### Recipe 12 — List local model registrations
+
+```bash
+opal-yolo models list
+```
+
+Use the `model_id` value in subsequent `show`, `load`, `unload`, `predict`, and
+`predict-frame` commands.
+
+### Recipe 13 — Inspect one model
+
+```bash
+opal-yolo models show yolov8n
+```
+
+The response includes tasks, loaded state, availability, and metadata such as
+file format or size.
+
+### Recipe 14 — Load a model on the default device
+
+```bash
+opal-yolo models load yolov8n
+```
+
+The service selects an appropriate device. Repeated load calls are safe and
+return current state.
+
+### Recipe 15 — Load a model on a selected device
+
+```bash
+opal-yolo models load yolov8n --device cuda:0
+```
+
+Use `hardware list` first to verify the device exists and is available.
+
+### Recipe 16 — Unload an idle model
+
+```bash
+opal-yolo models unload yolov8n
+```
+
+Unloading removes the runtime model handle but does not delete the model file.
+A `409` response means the model is currently in use.
+
+### Recipe 17 — Run a basic local-image prediction
+
+```bash
+opal-yolo predict ./images/street.jpg --model-id yolov8n
+```
+
+The service resolves the path on the service host, decodes the image, and
+returns normalized detections.
+
+### Recipe 18 — Predict from a file URI
+
+```bash
+opal-yolo predict file:///C:/data/street.jpg --model-id yolov8n
+```
+
+Use forward slashes in a `file://` URI, including on Windows. Local `file://`
+sources do not require remote-source allowlisting.
+
+### Recipe 19 — Tune confidence, device, and engine options
+
+```bash
+opal-yolo predict ./images/street.jpg \
+  --model-id yolov8n \
+  --confidence 0.35 \
+  --device cuda:0 \
+  --engine-options '{"imgsz": 640}'
+```
+
+Unknown or invalid option names are rejected by the service according to the
+advertised capability schema.
+
+### Recipe 20 — Submit one frame envelope for prediction
+
+```bash
+opal-yolo predict-frame \
+  --image ./frames/00042.png \
+  --model-id yolov8n \
+  --confidence 0.3 \
+  --frame '{
+    "stream_id": "camera-1",
+    "frame_id": "00042",
+    "sequence": 42,
+    "captured_at": "2025-01-01T12:00:00Z",
+    "image": {"width": 640, "height": 480},
+    "transaction_id": "txn-123",
+    "request_id": "req-456",
+    "causation_id": "cause-789"
+  }'
+```
+
+The response echoes the supplied frame envelope and contains normalized
+detections aligned to the original image coordinates.
+
+## Scripting notes
+
+### Wait for a healthy service
+
+```bash
+until opal-yolo info health >/dev/null; do
+  sleep 1
+done
+opal-yolo models list
+```
+
+### Feed JSON output to `jq`
+
+```bash
+MODEL_ID=$(opal-yolo models list | jq -r '.[0].model_id')
+opal-yolo models load "$MODEL_ID"
+opal-yolo predict ./image.png --model-id "$MODEL_ID" |
+  jq '.detections[] | {class_name, confidence, box}'
+```
+
+### Preserve API errors for diagnostics
+
+```bash
+if ! opal-yolo models unload "$MODEL_ID" >result.json; then
+  cat result.json
+  exit 1
+fi
+```
+
+## Troubleshooting
+
+| Symptom | Likely cause | Action |
+|---|---|---|
+| `connection_failed` | Wrong URL or service not running | Verify `--url` and `info health` |
+| `unauthorized` | Missing/wrong bearer token | Set `--token` or `OPAL_YOLO_TOKEN` |
+| `not_found` model | Model not discovered under configured roots | Run `models list`; check service `OPAL_YOLO_MODEL_DIRS` |
+| `validation_failed` device | Device ID unavailable or unknown | Run `hardware list`; use a listed available ID |
+| `validation_failed` options | Unsupported `engine_options` | Run `engines capabilities` and use its schema |
+| `payload_too_large` | Image exceeds service limit | Reduce image size or raise service `max_image_bytes` |
+| `capacity_exceeded` | Bounded inference capacity is exhausted | Retry later or raise service `max_concurrent_predictions` |
+| `service_unavailable` | Ultralytics/model/runtime unavailable | Install `yolo` extra and verify model/service logs |
+| `Remote image sources are not permitted` | HTTP(S) source is not allowlisted | Use a local/file source or configure the allowlist |

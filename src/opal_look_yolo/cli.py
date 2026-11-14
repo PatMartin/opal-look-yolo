@@ -7,6 +7,8 @@ from typing import Annotated, Any
 import httpx
 import typer
 
+from opal_look_yolo.tree_cmds import register as register_tree_commands
+
 DEFAULT_URL = "http://127.0.0.1:8086"
 
 
@@ -215,6 +217,7 @@ def create_cli_app(transport: httpx.BaseTransport | None = None) -> typer.Typer:
     app.add_typer(engines_app, name="engines")
     app.add_typer(models_app, name="models")
     app.add_typer(hardware_app, name="hardware")
+    register_tree_commands(app, "opal-yolo")
     return app
 
 
