@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ipaddress
+import json
+import os
+from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from opal_look_yolo import __version__
@@ -18,6 +21,17 @@ class Settings(BaseSettings):
     port: int = Field(default=8086, ge=1, le=65535)
     auth_disabled: bool = True
     auth_token: str | None = None
+    model_dirs: list[Path] = Field(default_factory=lambda: [Path("models")])
+
+    @field_validator("model_dirs", mode="before")
+    @classmethod
+    def parse_model_dirs(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip()
+        if stripped.startswith("["):
+            return json.loads(stripped)
+        return [part for part in stripped.split(os.pathsep) if part]
 
     @model_validator(mode="after")
     def validate_auth_policy(self) -> Settings:
