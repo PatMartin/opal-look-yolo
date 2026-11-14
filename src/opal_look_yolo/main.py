@@ -10,6 +10,7 @@ from opal_look_yolo.engines import EngineRegistry, UltralyticsYoloEngine
 from opal_look_yolo.errors import register_exception_handlers
 from opal_look_yolo.middleware.auth import require_bearer_auth
 from opal_look_yolo.middleware.correlation import CorrelationMiddleware
+from opal_look_yolo.middleware.logging import RequestLoggingMiddleware
 from opal_look_yolo.models import (
     EngineModelRuntime,
     LocalModelRepository,
@@ -58,7 +59,12 @@ def create_app(
         resolved_model_service,
         resolved_runtime,
         resolved_registry,
-        ImageSourceResolver(resolved_settings.max_image_bytes),
+        ImageSourceResolver(
+            resolved_settings.max_image_bytes,
+            allow_remote_sources=resolved_settings.allow_remote_sources,
+            allowed_remote_hosts=resolved_settings.allowed_remote_hosts,
+            remote_timeout_seconds=resolved_settings.remote_source_timeout_seconds,
+        ),
         resolved_settings.max_concurrent_predictions,
     )
 
@@ -68,6 +74,7 @@ def create_app(
         lambda: resolved_registry.describe("yolo").available
     )
 
+    app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(CorrelationMiddleware)
     register_exception_handlers(app)
 
