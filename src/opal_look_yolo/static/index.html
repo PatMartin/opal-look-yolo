@@ -92,23 +92,23 @@ async function refresh() {
       request('/hardware/'), request('/model/')
     ]);
     document.querySelector('#service').innerHTML =
-      `<p><strong>${info.service}</strong> ${info.version} — <span class="ok">${health.status}</span></p>`;
+      `<p><strong>${info.name}</strong> ${info.version} — <span class="ok">${health.status}</span></p>`;
     document.querySelector('#engines').innerHTML = rows(engines, [
-      ['ID', e => e.id], ['Name', e => e.name], ['Version', e => e.version],
+      ['ID', e => e.engine_id], ['Name', e => e.name], ['Version', e => e.version],
       ['Available', e => e.available]
     ]);
     document.querySelector('#hardware').innerHTML = rows(hardware, [
-      ['ID', d => d.id], ['Kind', d => d.kind], ['Name', d => d.name],
-      ['Memory', d => d.memory_bytes]
+      ['ID', d => d.device_id], ['Type', d => d.type], ['Name', d => d.name],
+      ['Memory MB', d => d.memory_mb]
     ]);
     document.querySelector('#models').innerHTML = rows(models, [
-      ['ID', m => m.id], ['Name', m => m.name], ['Path', m => m.path],
-      ['Loaded', m => m.loaded], ['Device', m => m.device],
-      ['', m => `<button onclick="loadModel('${m.id}')">Load</button>
-        <button onclick="unloadModel('${m.id}')">Unload</button>`]
+      ['ID', m => m.model_id], ['Tasks', m => (m.tasks || []).join(', ')],
+      ['Loaded', m => m.loaded], ['Available', m => m.available],
+      ['', m => `<button onclick="loadModel('${m.model_id}')">Load</button>
+        <button onclick="unloadModel('${m.model_id}')">Unload</button>`]
     ]);
     if (models.length && !document.querySelector('#model-id').value) {
-      document.querySelector('#model-id').value = models[0].id;
+      document.querySelector('#model-id').value = models[0].model_id;
     }
     show({info, health});
   } catch (error) { show(error, true); }

@@ -27,6 +27,7 @@ _RESPONSES = {
 
 @router.post(
     "/predict",
+    operation_id="yolo_predict",
     response_model=PredictResult,
     responses=_RESPONSES,
     response_model_exclude_none=True,
@@ -37,6 +38,7 @@ async def predict(request: Request, payload: PredictRequest) -> PredictResult:
 
 @router.post(
     "/predict/frame",
+    operation_id="yolo_predict_frame",
     response_model=FrameResult,
     responses=_RESPONSES,
     response_model_exclude_none=True,

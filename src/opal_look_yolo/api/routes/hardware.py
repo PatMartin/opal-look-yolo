@@ -7,20 +7,29 @@ from opal_look_yolo.schemas.hardware import Hardware
 
 router = APIRouter(prefix="/hardware", tags=["hardware"])
 
-_RESPONSES = {
-    status.HTTP_401_UNAUTHORIZED: {"model": OpalError},
+_RESPONSES = {status.HTTP_401_UNAUTHORIZED: {"model": OpalError}}
+_READ_RESPONSES = {
+    **_RESPONSES,
     status.HTTP_404_NOT_FOUND: {"model": OpalError},
 }
 
 
-@router.get("/", response_model=list[Hardware], responses=_RESPONSES,
+@router.get(
+    "/",
+    operation_id="yolo_hardware_list",
+    response_model=list[Hardware],
+    responses=_RESPONSES,
     response_model_exclude_none=True,
 )
 async def list_hardware(request: Request) -> list[Hardware]:
     return request.app.state.hardware_service.list_devices()
 
 
-@router.get("/{device_id}", response_model=Hardware, responses=_RESPONSES,
+@router.get(
+    "/{device_id}",
+    operation_id="yolo_hardware_show",
+    response_model=Hardware,
+    responses=_READ_RESPONSES,
     response_model_exclude_none=True,
 )
 async def show_hardware(device_id: str, request: Request) -> Hardware:

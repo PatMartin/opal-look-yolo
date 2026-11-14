@@ -7,13 +7,18 @@ from opal_look_yolo.schemas.common import HealthStatus, OpalError, ServiceInfo
 
 router = APIRouter(tags=["info"])
 
-_ERROR_RESPONSES = {
-    status.HTTP_401_UNAUTHORIZED: {"model": OpalError},
+_ERROR_RESPONSES = {status.HTTP_401_UNAUTHORIZED: {"model": OpalError}}
+_HEALTH_RESPONSES = {
+    **_ERROR_RESPONSES,
     status.HTTP_503_SERVICE_UNAVAILABLE: {"model": OpalError},
 }
 
 
-@router.get("/info/", response_model=ServiceInfo, responses=_ERROR_RESPONSES,
+@router.get(
+    "/info/",
+    operation_id="yolo_info_show",
+    response_model=ServiceInfo,
+    responses=_ERROR_RESPONSES,
     response_model_exclude_none=True,
 )
 async def show_info(request: Request) -> ServiceInfo:
@@ -25,7 +30,11 @@ async def show_info(request: Request) -> ServiceInfo:
     )
 
 
-@router.get("/health/", response_model=HealthStatus, responses=_ERROR_RESPONSES,
+@router.get(
+    "/health/",
+    operation_id="yolo_info_health",
+    response_model=HealthStatus,
+    responses=_HEALTH_RESPONSES,
     response_model_exclude_none=True,
 )
 async def show_health(request: Request) -> HealthStatus:

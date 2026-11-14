@@ -31,6 +31,8 @@ paths:
         group: info
         command: show
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Adapter information
           content:
@@ -61,6 +63,8 @@ paths:
         group: info
         command: health
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Healthy adapter
           content:
@@ -93,6 +97,8 @@ paths:
         group: engines
         command: list
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Engine catalog
           content:
@@ -126,6 +132,8 @@ paths:
         group: engines
         command: discover
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Discovery result
           content:
@@ -160,6 +168,8 @@ paths:
         group: engines
         command: show
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Engine
           content:
@@ -194,6 +204,8 @@ paths:
         group: engines
         command: capabilities
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Capability catalog
           content:
@@ -226,6 +238,8 @@ paths:
         group: models
         command: list
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Model catalog
           content:
@@ -260,6 +274,8 @@ paths:
         group: models
         command: show
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Model metadata
           content:
@@ -301,6 +317,8 @@ paths:
             schema:
               $ref: '#/components/schemas/LoadRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Current model state
           content:
@@ -342,6 +360,8 @@ paths:
         group: models
         command: unload
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Model state
           content:
@@ -376,6 +396,8 @@ paths:
         group: hardware
         command: list
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Available devices
           content:
@@ -410,6 +432,8 @@ paths:
         group: hardware
         command: show
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Device metadata
           content:
@@ -450,6 +474,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PredictRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Normalized detections
           content:
@@ -507,6 +533,8 @@ paths:
               frame:
                 contentType: application/json
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: Normalized frame detections
           content:
@@ -949,6 +977,21 @@ components:
         error:
           $ref: '#/components/schemas/ErrorBody'
   responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpalError'
+      headers:
+        X-Opal-Session-Id:
+          $ref: '#/components/headers/SessionIdHeader'
+        X-Opal-Transaction-Id:
+          $ref: '#/components/headers/TransactionIdHeader'
+        X-Opal-Request-Id:
+          $ref: '#/components/headers/RequestIdHeader'
+        X-Opal-Causation-Id:
+          $ref: '#/components/headers/CausationIdHeader'
     BadRequest:
       description: Bad request
       content:
