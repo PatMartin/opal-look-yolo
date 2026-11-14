@@ -23,8 +23,12 @@ def make_client() -> Callable[..., TestClient]:
         hardware_provider: HardwareProvider | None = None,
         model_repository: ModelRepository | None = None,
         model_runtime: ModelRuntime | None = None,
+        service_settings: Settings | None = None,
     ) -> TestClient:
-        settings = Settings(auth_disabled=auth_disabled, auth_token=auth_token)
+        settings = service_settings or Settings(
+            auth_disabled=auth_disabled,
+            auth_token=auth_token,
+        )
         app = create_app(
             settings=settings,
             engine_probe=engine_probe or (lambda: True),

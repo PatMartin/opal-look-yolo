@@ -13,11 +13,15 @@ _RESPONSES = {
 }
 
 
-@router.get("/", response_model=list[Hardware], responses=_RESPONSES)
+@router.get("/", response_model=list[Hardware], responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def list_hardware(request: Request) -> list[Hardware]:
     return request.app.state.hardware_service.list_devices()
 
 
-@router.get("/{device_id}", response_model=Hardware, responses=_RESPONSES)
+@router.get("/{device_id}", response_model=Hardware, responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def show_hardware(device_id: str, request: Request) -> Hardware:
     return request.app.state.hardware_service.get_device(device_id)

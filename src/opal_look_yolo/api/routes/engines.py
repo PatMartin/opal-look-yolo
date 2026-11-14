@@ -13,17 +13,23 @@ _RESPONSES = {
 }
 
 
-@router.get("/", response_model=list[Engine], responses=_RESPONSES)
+@router.get("/", response_model=list[Engine], responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def list_engines(request: Request) -> list[Engine]:
     return request.app.state.engine_registry.list()
 
 
-@router.post("/discover", response_model=list[Engine], responses=_RESPONSES)
+@router.post("/discover", response_model=list[Engine], responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def discover_engines(request: Request) -> list[Engine]:
     return request.app.state.engine_registry.discover()
 
 
-@router.get("/{engine_id}", response_model=Engine, responses=_RESPONSES)
+@router.get("/{engine_id}", response_model=Engine, responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def show_engine(engine_id: str, request: Request) -> Engine:
     return request.app.state.engine_registry.describe(engine_id)
 
@@ -32,6 +38,7 @@ async def show_engine(engine_id: str, request: Request) -> Engine:
     "/{engine_id}/capabilities",
     response_model=Capabilities,
     responses=_RESPONSES,
+    response_model_exclude_none=True,
 )
 async def engine_capabilities(engine_id: str, request: Request) -> Capabilities:
     devices = [

@@ -18,17 +18,23 @@ _RESPONSES = {
 }
 
 
-@router.get("/", response_model=list[Model], responses=_RESPONSES)
+@router.get("/", response_model=list[Model], responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def list_models(request: Request) -> list[Model]:
     return request.app.state.model_service.list_models()
 
 
-@router.get("/{model_id}", response_model=Model, responses=_RESPONSES)
+@router.get("/{model_id}", response_model=Model, responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def show_model(model_id: str, request: Request) -> Model:
     return request.app.state.model_service.get_model(model_id)
 
 
-@router.post("/{model_id}/load", response_model=Model, responses=_RESPONSES)
+@router.post("/{model_id}/load", response_model=Model, responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def load_model(
     model_id: str,
     request: Request,
@@ -38,6 +44,8 @@ async def load_model(
     return request.app.state.model_service.load_model(model_id, device=device)
 
 
-@router.post("/{model_id}/unload", response_model=Model, responses=_RESPONSES)
+@router.post("/{model_id}/unload", response_model=Model, responses=_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def unload_model(model_id: str, request: Request) -> Model:
     return request.app.state.model_service.unload_model(model_id)

@@ -34,7 +34,6 @@ def test_hardware_list_returns_devices(make_client):
             "device_id": "cpu",
             "type": "cpu",
             "available": True,
-            "memory_mb": None,
             "name": "CPU",
         },
         {

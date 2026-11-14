@@ -13,7 +13,9 @@ _ERROR_RESPONSES = {
 }
 
 
-@router.get("/info/", response_model=ServiceInfo, responses=_ERROR_RESPONSES)
+@router.get("/info/", response_model=ServiceInfo, responses=_ERROR_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def show_info(request: Request) -> ServiceInfo:
     settings = request.app.state.settings
     return ServiceInfo(
@@ -23,7 +25,9 @@ async def show_info(request: Request) -> ServiceInfo:
     )
 
 
-@router.get("/health/", response_model=HealthStatus, responses=_ERROR_RESPONSES)
+@router.get("/health/", response_model=HealthStatus, responses=_ERROR_RESPONSES,
+    response_model_exclude_none=True,
+)
 async def show_health(request: Request) -> HealthStatus:
     try:
         engine_available = bool(request.app.state.engine_probe())

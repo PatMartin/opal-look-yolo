@@ -37,7 +37,7 @@ def test_health_reports_available_engine(make_client):
     response = make_client(engine_probe=lambda: True).get("/api/v1/health/", headers=AUTH)
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"status": "ok", "engine_available": True, "detail": None}
+    assert response.json() == {"status": "ok", "engine_available": True}
 
 
 def test_health_reports_degraded_when_engine_is_unavailable(make_client):
