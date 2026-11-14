@@ -22,6 +22,8 @@ from opal_look_yolo.services.hardware import (
     LocalHardwareProvider,
 )
 from opal_look_yolo.services.models import ModelService
+from opal_look_yolo.services.prediction import PredictionService
+from opal_look_yolo.services.sources import ImageSourceResolver
 
 
 def create_app(
@@ -47,11 +49,21 @@ def create_app(
     app.state.settings = resolved_settings
     app.state.engine_registry = resolved_registry
     app.state.hardware_service = resolved_hardware
-    app.state.model_service = ModelService(
+    resolved_model_service = ModelService(
         resolved_models,
         resolved_runtime,
         resolved_hardware,
     )
+    resolved_prediction = PredictionService(
+        resolved_model_service,
+        resolved_runtime,
+        resolved_registry,
+        ImageSourceResolver(resolved_settings.max_image_bytes),
+        resolved_settings.max_concurrent_predictions,
+    )
+
+    app.state.model_service = resolved_model_service
+    app.state.prediction_service = resolved_prediction
     app.state.engine_probe = engine_probe or (
         lambda: resolved_registry.describe("yolo").available
     )

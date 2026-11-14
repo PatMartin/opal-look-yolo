@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     auth_disabled: bool = True
     auth_token: str | None = None
     model_dirs: list[Path] = Field(default_factory=lambda: [Path("models")])
+    max_image_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+    max_concurrent_predictions: int = Field(default=2, ge=1)
 
     @field_validator("model_dirs", mode="before")
     @classmethod
