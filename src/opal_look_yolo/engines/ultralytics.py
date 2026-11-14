@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import importlib.metadata
 import importlib.util
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from copy import deepcopy
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from fastapi import status
+
+from opal_look_yolo.errors import OpalException
 from opal_look_yolo.schemas.engines import Capabilities, Engine
 
 YOLO_OPTIONS_SCHEMA: dict[str, Any] = {
@@ -26,6 +31,15 @@ YOLO_OPTIONS_SCHEMA: dict[str, Any] = {
     },
 }
 
+ModelFactory = Callable[[str], Any]
+
+
+@dataclass
+class UltralyticsModelHandle:
+    path: Path
+    device: str | None
+    model: Any
+
 
 class UltralyticsYoloEngine:
     engine_id = "yolo"
@@ -33,9 +47,15 @@ class UltralyticsYoloEngine:
     tasks = ["detect"]
     formats = ["jpg", "jpeg", "png"]
 
+    def __init__(self, model_factory: ModelFactory | None = None) -> None:
+        self._model_factory = model_factory
+
     @property
     def available(self) -> bool:
-        return importlib.util.find_spec("ultralytics") is not None
+        return (
+            self._model_factory is not None
+            or importlib.util.find_spec("ultralytics") is not None
+        )
 
     @property
     def version(self) -> str | None:
@@ -70,3 +90,44 @@ class UltralyticsYoloEngine:
             formats=list(self.formats),
             supported_devices=list(supported_devices or ["cpu"]),
         )
+
+    def load_model(
+        self,
+        path: Path,
+        device: str | None = None,
+    ) -> UltralyticsModelHandle:
+        factory = self._model_factory or self._import_model_factory()
+        try:
+            model = factory(str(path))
+            if device is not None and callable(getattr(model, "to", None)):
+                moved = model.to(device)
+                if moved is not None:
+                    model = moved
+        except OpalException:
+            raise
+        except Exception as exc:
+            raise OpalException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "service_unavailable",
+                "YOLO model load failed",
+            ) from exc
+        return UltralyticsModelHandle(path=path, device=device, model=model)
+
+    def unload_model(self, handle: UltralyticsModelHandle) -> None:
+        model = getattr(handle, "model", handle)
+        close = getattr(model, "close", None)
+        if callable(close):
+            close()
+        if hasattr(handle, "model"):
+            handle.model = None
+
+    def _import_model_factory(self) -> ModelFactory:
+        try:
+            from ultralytics import YOLO
+        except ImportError as exc:
+            raise OpalException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "service_unavailable",
+                "Ultralytics YOLO engine is not installed",
+            ) from exc
+        return YOLO
