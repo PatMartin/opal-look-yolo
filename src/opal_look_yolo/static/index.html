@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OPAL Look YOLO</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #111827; color: #e5e7eb; }
+    header { padding: 1rem 1.5rem; background: #0f172a; border-bottom: 1px solid #334155; }
+    main { display: grid; gap: 1rem; padding: 1.5rem; }
+    section { background: #1f2937; border: 1px solid #374151; border-radius: .5rem; padding: 1rem; }
+    button, input, select { border: 1px solid #64748b; border-radius: .35rem; padding: .45rem; }
+    button { background: #2563eb; border-color: #2563eb; color: white; cursor: pointer; }
+    input, select { background: #111827; color: #e5e7eb; }
+    label { display: grid; gap: .25rem; font-size: .9rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
+    th, td { border-bottom: 1px solid #374151; padding: .5rem; text-align: left; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(11rem,1fr)); gap: .75rem; }
+    .muted { color: #94a3b8; }
+    pre { max-height: 24rem; overflow: auto; background: #020617; padding: .75rem; white-space: pre-wrap; }
+    .error { color: #fca5a5; }
+    .ok { color: #86efac; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>OPAL Look YOLO</h1>
+  <div class="grid">
+    <label>Bearer token <input id="token" type="password" autocomplete="off"></label>
+    <label>&nbsp;<button id="save-token">Use token</button></label>
+    <label>&nbsp;<button id="refresh">Refresh all</button></label>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Service</h2>
+    <div id="service">Loading…</div>
+  </section>
+  <section>
+    <h2>Engines</h2><div id="engines"></div>
+    <h2>Hardware</h2><div id="hardware"></div>
+  </section>
+  <section>
+    <h2>Models</h2><div id="models"></div>
+  </section>
+  <section>
+    <h2>JSON prediction</h2>
+    <div class="grid">
+      <label>Model ID <input id="model-id" required></label>
+      <label>Image source <input id="source" placeholder="local path or file:// URI" required></label>
+      <label>Confidence <input id="confidence" type="number" min="0" max="1" step="0.05" value="0.25"></label>
+      <label>Device <input id="device" placeholder="auto"></label>
+      <label>Engine options JSON <input id="engine-options" placeholder="{}"></label>
+      <label>&nbsp;<button id="predict">Predict</button></label>
+    </div>
+  </section>
+  <section><h2>Result</h2><pre id="result">No request yet.</pre></section>
+</main>
+<script>
+const tokenInput = document.querySelector('#token');
+tokenInput.value = localStorage.getItem('opal-yolo-token') || '';
+const result = document.querySelector('#result');
+
+function headers() {
+  const token = tokenInput.value.trim();
+  return token ? {Authorization: `Bearer ${token}`} : {};
+}
+async function request(path, options = {}) {
+  const response = await fetch(`/api/v1${path}`, {
+    ...options,
+    headers: {'Content-Type': 'application/json', ...headers(), ...(options.headers || {})}
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw data.error || {message: `HTTP ${response.status}`};
+  return data;
+}
+function show(data, failed = false) {
+  result.className = failed ? 'error' : 'ok';
+  result.textContent = JSON.stringify(data, null, 2);
+}
+function rows(items, columns) {
+  if (!items.length) return '<p class="muted">None found.</p>';
+  return `<table><thead><tr>${columns.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>` +
+    items.map(item => `<tr>${columns.map(c => `<td>${c[1](item) ?? ''}</td>`).join('')}</tr>`).join('') +
+    '</tbody></table>';
+}
+async function refresh() {
+  try {
+    const [info, health, engines, hardware, models] = await Promise.all([
+      request('/info/'), request('/health/'), request('/engine/'),
+      request('/hardware/'), request('/model/')
+    ]);
+    document.querySelector('#service').innerHTML =
+      `<p><strong>${info.service}</strong> ${info.version} — <span class="ok">${health.status}</span></p>`;
+    document.querySelector('#engines').innerHTML = rows(engines, [
+      ['ID', e => e.id], ['Name', e => e.name], ['Version', e => e.version],
+      ['Available', e => e.available]
+    ]);
+    document.querySelector('#hardware').innerHTML = rows(hardware, [
+      ['ID', d => d.id], ['Kind', d => d.kind], ['Name', d => d.name],
+      ['Memory', d => d.memory_bytes]
+    ]);
+    document.querySelector('#models').innerHTML = rows(models, [
+      ['ID', m => m.id], ['Name', m => m.name], ['Path', m => m.path],
+      ['Loaded', m => m.loaded], ['Device', m => m.device],
+      ['', m => `<button onclick="loadModel('${m.id}')">Load</button>
+        <button onclick="unloadModel('${m.id}')">Unload</button>`]
+    ]);
+    if (models.length && !document.querySelector('#model-id').value) {
+      document.querySelector('#model-id').value = models[0].id;
+    }
+    show({info, health});
+  } catch (error) { show(error, true); }
+}
+window.loadModel = async id => {
+  try { show(await request(`/model/${id}/load`, {method: 'POST', body: '{}'})); refresh(); }
+  catch (error) { show(error, true); }
+};
+window.unloadModel = async id => {
+  try { show(await request(`/model/${id}/unload`, {method: 'POST', body: '{}'})); refresh(); }
+  catch (error) { show(error, true); }
+};
+document.querySelector('#save-token').onclick = () => {
+  localStorage.setItem('opal-yolo-token', tokenInput.value.trim()); refresh();
+};
+document.querySelector('#refresh').onclick = refresh;
+document.querySelector('#predict').onclick = async () => {
+  let options;
+  try { options = JSON.parse(document.querySelector('#engine-options').value || '{}'); }
+  catch { return show({error: {code: 'validation_failed', message: 'Engine options must be JSON'}}, true); }
+  try {
+    show(await request('/predict', {method: 'POST', body: JSON.stringify({
+      engine: 'yolo', model_id: document.querySelector('#model-id').value,
+      source: document.querySelector('#source').value,
+      confidence: Number(document.querySelector('#confidence').value),
+      device: document.querySelector('#device').value || null,
+      engine_options: options, include_native: false
+    })}));
+  } catch (error) { show(error, true); }
+};
+refresh();
+</script>
+</body>
+</html>

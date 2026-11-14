@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from opal_look_yolo.api.routes import engines, hardware, info, models, predict
 from opal_look_yolo.config import Settings
@@ -25,6 +28,8 @@ from opal_look_yolo.services.hardware import (
 from opal_look_yolo.services.models import ModelService
 from opal_look_yolo.services.prediction import PredictionService
 from opal_look_yolo.services.sources import ImageSourceResolver
+
+_STATIC_DIR = Path(__file__).parent / "static"
 
 
 def create_app(
@@ -85,6 +90,12 @@ def create_app(
     api.include_router(models.router)
     api.include_router(predict.router)
     app.include_router(api)
+
+    @app.get("/", include_in_schema=False)
+    def spa_redirect() -> RedirectResponse:
+        return RedirectResponse("/app/")
+
+    app.mount("/app", StaticFiles(directory=_STATIC_DIR, html=True), name="spa")
     return app
 
 
