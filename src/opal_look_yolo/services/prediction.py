@@ -71,28 +71,46 @@ class PredictionService:
         self.capacity = BoundedInferenceCapacity(max_concurrent)
 
     async def predict(self, request: PredictRequest) -> PredictResult:
-        self._validate_options(request.engine_options or {})
         resolved = self.resolver.resolve(request.source)
+        return await self.predict_image(
+            resolved.image,
+            model_id=request.model_id,
+            confidence=request.confidence,
+            device=request.device,
+            engine_options=request.engine_options,
+            include_native=request.include_native,
+        )
 
+    async def predict_image(
+        self,
+        image: Image.Image,
+        *,
+        model_id: str,
+        confidence: float,
+        device: str | None,
+        engine_options: dict[str, Any] | None,
+        include_native: bool,
+    ) -> PredictResult:
+        self._validate_options(engine_options or {})
         async with self.capacity.acquire():
-            with self.models.use_model(request.model_id, request.device) as loaded:
+            with self.models.use_model(model_id, device) as loaded:
                 result = await asyncio.to_thread(
                     self.runtime.predict,
                     loaded.handle,
-                    resolved.image,
-                    request.confidence,
-                    request.device,
-                    request.engine_options,
-                    request.include_native,
+                    image,
+                    confidence,
+                    device,
+                    engine_options,
+                    include_native,
                 )
 
-        width, height = resolved.image.size
+        width, height = image.size
         return PredictResult(
             engine="yolo",
-            model_id=request.model_id,
+            model_id=model_id,
             image=ImageInfo(width=width, height=height),
             detections=result.detections,
-            native=result.native if request.include_native else None,
+            native=result.native if include_native else None,
             execution_id=uuid.uuid4().hex,
         )
 
