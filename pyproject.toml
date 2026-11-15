@@ -18,14 +18,14 @@ dependencies = [
   "typer>=0.12,<1.0",
   "rich>=13,<16",
   "pillow>=10.4,<13.0",
-  "jsonschema>=4.23,<5.0"
+  "jsonschema>=4.23,<5.0",
+  "ultralytics>=8.3,<9.0"
 ]
 
 [project.scripts]
 opal-yolo = "opal_look_yolo.cli:main"
 
 [project.optional-dependencies]
-yolo = ["ultralytics>=8.3,<9.0"]
 dev = [
   "pytest>=8.0,<10.0",
   "ruff>=0.8,<1.0",

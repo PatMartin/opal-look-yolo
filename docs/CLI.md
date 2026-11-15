@@ -1,9 +1,11 @@
 # OPAL Look YOLO CLI
 
 `opal-yolo` is the command-line client for the OPAL Look YOLO adapter. It is a
-Typer application that communicates with the service only through the public
-REST API. It does not import or invoke the inference service implementation
-locally.
+Typer application whose commands use the REST contract's paths, schemas, and
+error semantics. By default, each command creates the FastAPI application in the
+CLI process and sends the request through `httpx.ASGITransport`; no TCP listener
+or separate service process is required. Supplying `--url` or
+`OPAL_YOLO_URL` explicitly switches the same commands to a remote REST service.
 
 Use the CLI to inspect service health, discover engines and hardware, manage
 model lifecycle, run synchronous image predictions, submit frame envelopes, and
@@ -17,12 +19,9 @@ Install the package and its CLI entry point:
 python -m pip install -e .
 ```
 
-Optional real Ultralytics inference is a service-side dependency and is not
-required by the CLI itself:
-
-```bash
-python -m pip install -e ".[yolo]"
-```
+Ultralytics is a required project dependency and is used by the embedded
+application or a remote service for real inference. The adapter still degrades
+safely if the package cannot be imported in a development environment.
 
 Verify the entry point:
 
@@ -36,12 +35,13 @@ opal-yolo tree
 Global options must appear before the command group or command:
 
 ```bash
+opal-yolo info health
 opal-yolo --url http://127.0.0.1:8086 --token "$TOKEN" info show
 ```
 
 | Option | Environment variable | Default | Purpose |
 |---|---|---|---|
-| `--url` | `OPAL_YOLO_URL` | `http://127.0.0.1:8086` | Base URL of the YOLO adapter |
+| `--url` | `OPAL_YOLO_URL` | embedded ASGI | Remote adapter base URL; omit for in-process execution |
 | `--token` | `OPAL_YOLO_TOKEN` | unset | Bearer token sent as `Authorization: Bearer ...` |
 | `--install-completion` | — | — | Install shell completion |
 | `--show-completion` | — | — | Print shell completion script |
@@ -49,8 +49,40 @@ opal-yolo --url http://127.0.0.1:8086 --token "$TOKEN" info show
 Command-line options take precedence over environment variables. If the service
 is in loopback development mode with authentication disabled, omit `--token`.
 
-The CLI always sends an absolute HTTP request to `{url}/api/v1/...` and never
-places the bearer token in a query string or request payload.
+The CLI sends REST-shaped requests to `/api/v1/...` either over ASGI or over
+HTTP when `--url` is supplied. It never places the bearer token in a query
+string or request payload.
+
+## Execution modes
+
+### Embedded ASGI mode — default
+
+Omit `--url` and `OPAL_YOLO_URL`:
+
+```bash
+opal-yolo info health
+```
+
+The command creates the same FastAPI application used by `uvicorn`, but the
+request is dispatched directly through ASGI. Service settings still come from
+`OPAL_YOLO_*` environment variables and `.env`, including model directories,
+authentication policy, image limits, and remote-source policy.
+
+Because the application is created inside each CLI invocation, runtime model
+state does not persist between separate commands. `predict` automatically loads
+the requested model for that invocation, so use direct predictions for the
+normal embedded workflow. Use remote mode when you need a long-lived loaded
+model across separate CLI calls.
+
+### Remote REST mode
+
+Provide `--url` or set `OPAL_YOLO_URL`:
+
+```bash
+opal-yolo --url http://127.0.0.1:8086 info health
+```
+
+This is useful for interacting with a long-lived shared adapter process.
 
 ## Output and exit behavior
 
@@ -126,7 +158,8 @@ opal-yolo [--url] [--token]
 The `tree` output is generated from the live Typer/Click application, so it
 reflects the installed CLI rather than a hand-maintained command list.
 Required arguments and options are unbracketed; optional parameters are shown
-in brackets.
+in brackets. `tree` is a local introspection command and does not instantiate
+the embedded FastAPI application or contact a remote service.
 
 ## Command reference
 
@@ -180,8 +213,10 @@ opal-yolo models unload MODEL_ID
 ```
 
 - `load` sends `{}` by default and `{"device": "..."}` when `--device` is supplied.
-- Loading is repeat-safe: loading an already loaded model returns its current
-  state.
+- Loading is repeat-safe within one application runtime.
+- In embedded mode, each command receives a new runtime, so `load` and `unload`
+  report state for that invocation only; `predict` performs its own automatic
+  model load.
 - `unload` does not delete model files.
 - Unloading while predictions are active can return `409 conflict`.
 
@@ -276,19 +311,19 @@ envelope itself as a string; it does not accept a JSON file path for `--frame`.
 
 ## Authentication behavior
 
-When service authentication is enabled, provide a token globally or through the
-environment:
+When adapter authentication is enabled, provide a token globally or through the
+environment. This applies to both embedded ASGI mode and remote REST mode:
 
 ```bash
+opal-yolo --token "$TOKEN" models list
 opal-yolo --url https://yolo.example --token "$TOKEN" models list
 # or
-export OPAL_YOLO_URL=https://yolo.example
 export OPAL_YOLO_TOKEN="$TOKEN"
 opal-yolo models list
 ```
 
-Missing or invalid credentials produce the service's `unauthorized` error
-envelope and exit status `1`. When the service is explicitly configured for
+Missing or invalid credentials produce the adapter's `unauthorized` error
+envelope and exit status `1`. When the embedded application is configured for
 loopback development without authentication, omit the token.
 
 ## COOKBOOK
@@ -310,7 +345,7 @@ opal-yolo info health
 Use this in scripts before loading a model or predicting. A `503` response is
 reported as JSON with a nonzero exit code.
 
-### Recipe 3 — Configure a reusable endpoint and token
+### Recipe 3 — Configure a reusable remote endpoint and token
 
 ```bash
 export OPAL_YOLO_URL=http://127.0.0.1:8086
@@ -418,8 +453,9 @@ file format or size.
 opal-yolo models load yolov8n
 ```
 
-The service selects an appropriate device. Repeated load calls are safe and
-return current state.
+The adapter selects an appropriate device. Repeated load calls are safe and
+return current state. In embedded mode, the loaded state applies only to this
+CLI invocation.
 
 ### Recipe 15 — Load a model on a selected device
 
@@ -436,7 +472,9 @@ opal-yolo models unload yolov8n
 ```
 
 Unloading removes the runtime model handle but does not delete the model file.
-A `409` response means the model is currently in use.
+A `409` response means the model is currently in use. In embedded mode, use
+this to exercise lifecycle behavior in the invocation; it is not persistent
+after the command exits.
 
 ### Recipe 17 — Run a basic local-image prediction
 
@@ -493,13 +531,13 @@ detections aligned to the original image coordinates.
 
 ## Scripting notes
 
-### Wait for a healthy service
+### Wait for a healthy remote service
 
 ```bash
-until opal-yolo info health >/dev/null; do
+until opal-yolo --url http://127.0.0.1:8086 info health >/dev/null; do
   sleep 1
 done
-opal-yolo models list
+opal-yolo --url http://127.0.0.1:8086 models list
 ```
 
 ### Feed JSON output to `jq`
@@ -524,12 +562,13 @@ fi
 
 | Symptom | Likely cause | Action |
 |---|---|---|
-| `connection_failed` | Wrong URL or service not running | Verify `--url` and `info health` |
+| `connection_failed` | Wrong remote URL or service not running | Verify `--url`; omit it for embedded ASGI mode |
+| `configuration_failed` | Invalid embedded `OPAL_YOLO_*` settings | Inspect the reported setting and retry |
 | `unauthorized` | Missing/wrong bearer token | Set `--token` or `OPAL_YOLO_TOKEN` |
 | `not_found` model | Model not discovered under configured roots | Run `models list`; check service `OPAL_YOLO_MODEL_DIRS` |
 | `validation_failed` device | Device ID unavailable or unknown | Run `hardware list`; use a listed available ID |
 | `validation_failed` options | Unsupported `engine_options` | Run `engines capabilities` and use its schema |
 | `payload_too_large` | Image exceeds service limit | Reduce image size or raise service `max_image_bytes` |
 | `capacity_exceeded` | Bounded inference capacity is exhausted | Retry later or raise service `max_concurrent_predictions` |
-| `service_unavailable` | Ultralytics/model/runtime unavailable | Install `yolo` extra and verify model/service logs |
+| `service_unavailable` | Ultralytics/model/runtime unavailable | Reinstall dependencies and verify model/runtime logs |
 | `Remote image sources are not permitted` | HTTP(S) source is not allowlisted | Use a local/file source or configure the allowlist |

@@ -7,15 +7,13 @@ The authoritative API contract is `openapi/opal_look_yolo.yaml`. The implementat
 ## Requirements
 
 - Python 3.11 through 3.13
-- Optional real inference dependency: install the `yolo` extra, which brings in Ultralytics and its model dependencies
+- Ultralytics is a required runtime dependency for real YOLO inference
 
 ```bash
 python -m pip install -e ".[dev]"
-# For real Ultralytics inference:
-python -m pip install -e ".[yolo]"
 ```
 
-The service remains usable without Ultralytics for API, catalog, and lifecycle testing; the engine reports unavailable and model loading/inference fails safely until the extra and a supported model are installed.
+The API remains testable in environments where Ultralytics is not installed; the engine reports unavailable and model loading/inference fails safely until the dependency and a supported model are installed.
 
 ## Configuration
 
@@ -48,18 +46,21 @@ Then open `http://127.0.0.1:8086/app/` for the SPA. `/` redirects to the SPA.
 
 ## CLI
 
-The installed `opal-yolo` command calls the public REST API only.
+The installed `opal-yolo` command uses the public REST contract. It runs the
+FastAPI application through in-process ASGI by default, so no listener is
+required. See `docs/CLI.md` for the complete guide.
 
 ```bash
-opal-yolo --url http://127.0.0.1:8086 --token "$TOKEN" info show
-opal-yolo --url http://127.0.0.1:8086 engines list
-opal-yolo --url http://127.0.0.1:8086 models load MODEL_ID --device cpu
-opal-yolo --url http://127.0.0.1:8086 predict image.png --model-id MODEL_ID
-opal-yolo --url http://127.0.0.1:8086 predict-frame \
+opal-yolo info show
+opal-yolo engines list
+opal-yolo models load MODEL_ID --device cpu
+opal-yolo predict image.png --model-id MODEL_ID
+opal-yolo predict-frame \
   --image frame.png --model-id MODEL_ID --frame '{"stream_id":"s","frame_id":"f","sequence":1,"captured_at":"2025-01-01T00:00:00Z","image":{"width":640,"height":480}}'
 ```
 
-`OPAL_YOLO_URL` and `OPAL_YOLO_TOKEN` may replace the corresponding CLI options.
+Set `--url` or `OPAL_YOLO_URL` to target a separately running REST service.
+`OPAL_YOLO_TOKEN` supplies the bearer token when authentication is enabled.
 
 ## Architecture
 
@@ -73,7 +74,7 @@ opal-yolo --url http://127.0.0.1:8086 predict-frame \
 - Context-managed model usage counts active predictions and prevents unsafe unload.
 - A bounded semaphore limits concurrent inference.
 - Pillow source decoding and JSON Schema option validation form the prediction pipeline.
-- The Typer CLI routes every command through HTTPX to the public API.
+- The Typer CLI routes every command through HTTPX, using embedded ASGI by default or remote HTTP when `--url` is supplied.
 - The SPA is a package-bundled static client with no JavaScript build step.
 
 ## Contract coverage
@@ -110,11 +111,11 @@ with open('openapi/opal_look_yolo.yaml', encoding='utf-8') as source:
 PY
 ```
 
-At final verification: `78 passed`; Ruff and OpenAPI validation pass.
+At final verification: `81 passed`; Ruff and OpenAPI validation pass.
 
 ## Known limitations
 
-- Ultralytics inference is covered with mocked adapter tests; a real model/GPU smoke test requires the `yolo` extra and suitable weights.
+- Ultralytics inference is covered with mocked adapter tests; a real model/GPU smoke test requires suitable weights and hardware.
 - Model discovery is read-only and filesystem-backed; there is no persistence API or model installation workflow.
 - GPU discovery uses optional Torch integration and otherwise reports a CPU fallback.
 - The SPA is intentionally minimal and does not provide a multipart frame upload form.

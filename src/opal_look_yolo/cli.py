@@ -4,34 +4,37 @@ import json
 from pathlib import Path
 from typing import Annotated, Any
 
+import anyio
 import httpx
 import typer
+from fastapi import FastAPI
 
+from opal_look_yolo.main import create_app
 from opal_look_yolo.tree_cmds import register as register_tree_commands
 
-DEFAULT_URL = "http://127.0.0.1:8086"
+EMBEDDED_BASE_URL = "http://opal-yolo.local"
 
 
 class RestClient:
     def __init__(
         self,
-        base_url: str,
+        base_url: str | None,
         token: str | None,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+        service_app: FastAPI | None = None,
     ) -> None:
         self.token = token
-        self.client = httpx.Client(
-            base_url=base_url.rstrip("/"),
-            transport=transport,
-            timeout=30.0,
-        )
+        self.base_url = (base_url or EMBEDDED_BASE_URL).rstrip("/")
+        self.transport = transport
+        self.service_app = service_app
+        self.embedded = base_url is None and transport is None
 
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
         headers = dict(kwargs.pop("headers", {}))
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         try:
-            response = self.client.request(method, path, headers=headers, **kwargs)
+            response = anyio.run(self._request, method, path, headers, kwargs)
         except httpx.HTTPError as exc:
             _fail({"error": {"code": "connection_failed", "message": str(exc)}})
         if response.status_code >= 400:
@@ -49,6 +52,36 @@ class RestClient:
             return response.json()
         except ValueError:
             return {}
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        headers: dict[str, str],
+        kwargs: dict[str, Any],
+    ) -> httpx.Response:
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            transport=self._client_transport(),
+            timeout=30.0,
+        ) as client:
+            return await client.request(method, path, headers=headers, **kwargs)
+
+    def _client_transport(self) -> httpx.AsyncBaseTransport | None:
+        if not self.embedded:
+            return self.transport
+        try:
+            service = self.service_app or create_app()
+        except Exception as exc:
+            _fail(
+                {
+                    "error": {
+                        "code": "configuration_failed",
+                        "message": f"Embedded YOLO application failed to start: {exc}",
+                    }
+                }
+            )
+        return httpx.ASGITransport(app=service)
 
 
 def _fail(payload: dict[str, Any]) -> None:
@@ -76,7 +109,10 @@ def _json_object(raw: str | None, name: str) -> dict[str, Any]:
     return value
 
 
-def create_cli_app(transport: httpx.BaseTransport | None = None) -> typer.Typer:
+def create_cli_app(
+    transport: httpx.AsyncBaseTransport | None = None,
+    service_app: FastAPI | None = None,
+) -> typer.Typer:
     app = typer.Typer(no_args_is_help=True, help="OPAL Look YOLO REST API client")
     info_app = typer.Typer(no_args_is_help=True, help="Service information")
     engines_app = typer.Typer(no_args_is_help=True, help="Engine operations")
@@ -86,11 +122,11 @@ def create_cli_app(transport: httpx.BaseTransport | None = None) -> typer.Typer:
     @app.callback()
     def configure(
         ctx: typer.Context,
-        url: str = typer.Option(
-            DEFAULT_URL,
+        url: str | None = typer.Option(
+            None,
             "--url",
             envvar="OPAL_YOLO_URL",
-            help="YOLO adapter base URL",
+            help="Remote YOLO adapter base URL; omit to run embedded ASGI",
         ),
         token: str | None = typer.Option(
             None,
@@ -99,7 +135,14 @@ def create_cli_app(transport: httpx.BaseTransport | None = None) -> typer.Typer:
             help="Bearer token",
         ),
     ) -> None:
-        ctx.obj = {"client": RestClient(url, token, transport=transport)}
+        ctx.obj = {
+            "client": RestClient(
+                url,
+                token,
+                transport=transport,
+                service_app=service_app,
+            )
+        }
 
     @info_app.command("show")
     def info_show(ctx: typer.Context) -> None:

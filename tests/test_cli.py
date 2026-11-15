@@ -8,6 +8,8 @@ from PIL import Image
 from typer.testing import CliRunner
 
 from opal_look_yolo.cli import create_cli_app
+from opal_look_yolo.config import Settings
+from opal_look_yolo.main import create_app
 
 
 def invoke(arguments, handler):
@@ -181,3 +183,19 @@ def test_tree_ascii_variant():
     assert "│" not in output
     assert "\x1b[" not in output
     output.encode("ascii")
+
+
+def test_embedded_asgi_is_the_default_mode():
+    service = create_app(
+        settings=Settings(auth_disabled=True),
+        engine_probe=lambda: True,
+    )
+    app = create_cli_app(service_app=service)
+
+    result = CliRunner().invoke(app, ["info", "health"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == {
+        "status": "ok",
+        "engine_available": True,
+    }
