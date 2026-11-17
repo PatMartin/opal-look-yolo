@@ -4,9 +4,10 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from opal_look_yolo import __version__
 
@@ -21,11 +22,11 @@ class Settings(BaseSettings):
     port: int = Field(default=8086, ge=1, le=65535)
     auth_disabled: bool = True
     auth_token: str | None = None
-    model_dirs: list[Path] = Field(default_factory=lambda: [Path("models")])
+    model_dirs: Annotated[list[Path], NoDecode] = Field(default_factory=lambda: [Path("models")])
     max_image_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     max_concurrent_predictions: int = Field(default=2, ge=1)
     allow_remote_sources: bool = False
-    allowed_remote_hosts: list[str] = Field(default_factory=list)
+    allowed_remote_hosts: Annotated[list[str], NoDecode] = Field(default_factory=list)
     remote_source_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
 
     @field_validator("model_dirs", mode="before")
@@ -77,11 +78,11 @@ def dotenv_baseline() -> dict[str, object]:
         "OPAL_YOLO_HOST": defaults.host,
         "OPAL_YOLO_PORT": defaults.port,
         "OPAL_YOLO_AUTH_DISABLED": defaults.auth_disabled,
-        "OPAL_YOLO_MODEL_DIRS": json.dumps([str(path) for path in defaults.model_dirs]),
+        "OPAL_YOLO_MODEL_DIRS": os.pathsep.join(str(path) for path in defaults.model_dirs),
         "OPAL_YOLO_MAX_IMAGE_BYTES": defaults.max_image_bytes,
         "OPAL_YOLO_MAX_CONCURRENT_PREDICTIONS": defaults.max_concurrent_predictions,
         "OPAL_YOLO_ALLOW_REMOTE_SOURCES": defaults.allow_remote_sources,
-        "OPAL_YOLO_ALLOWED_REMOTE_HOSTS": json.dumps(defaults.allowed_remote_hosts),
+        "OPAL_YOLO_ALLOWED_REMOTE_HOSTS": ",".join(defaults.allowed_remote_hosts),
         "OPAL_YOLO_REMOTE_SOURCE_TIMEOUT_SECONDS": defaults.remote_source_timeout_seconds,
         "OPAL_YOLO_AUTH_TOKEN": "<set-a-token>",
     }

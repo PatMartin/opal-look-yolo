@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from opal_look_yolo.cli import create_cli_app
-from opal_look_yolo.config import dotenv_baseline
+from opal_look_yolo.config import Settings, dotenv_baseline
 from opal_look_yolo.dotenv import DotenvError, prepare
 
 
@@ -115,7 +116,15 @@ def test_empty_url_environment_selects_embedded_mode(tmp_path, monkeypatch):
     assert result.exit_code == 0
 
 
+def test_list_settings_accept_plain_dotenv_values(monkeypatch):
+    monkeypatch.setenv("OPAL_YOLO_MODEL_DIRS", "resources/models")
+    monkeypatch.setenv("OPAL_YOLO_ALLOWED_REMOTE_HOSTS", "images.local,files.example")
+    settings = Settings(auth_disabled=True)
+    assert settings.model_dirs == [Path("resources/models")]
+    assert settings.allowed_remote_hosts == ["images.local", "files.example"]
+
+
 def test_yolo_baseline_contains_supported_defaults():
     baseline = dotenv_baseline()
     assert baseline["OPAL_YOLO_PORT"] == 8086
-    assert baseline["OPAL_YOLO_MODEL_DIRS"] == '["models"]'
+    assert baseline["OPAL_YOLO_MODEL_DIRS"] == "models"
