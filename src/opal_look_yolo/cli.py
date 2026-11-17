@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -9,6 +10,8 @@ import httpx
 import typer
 from fastapi import FastAPI
 
+from opal_look_yolo.config import Settings, dotenv_baseline
+from opal_look_yolo.dotenv import DotenvError, prepare
 from opal_look_yolo.main import create_app
 from opal_look_yolo.tree_cmds import register as register_tree_commands
 
@@ -126,24 +129,52 @@ def create_cli_app(
         url: str | None = typer.Option(
             None,
             "--url",
-            envvar="OPAL_YOLO_URL",
             help="Remote YOLO adapter base URL; omit to run embedded ASGI",
         ),
         token: str | None = typer.Option(
             None,
             "--token",
-            envvar="OPAL_YOLO_TOKEN",
             help="Bearer token",
         ),
+        env_file: Annotated[
+            Path | None,
+            typer.Option("--env-file", help="Load this dotenv file instead of ./.env"),
+        ] = None,
+        no_env_file: Annotated[
+            bool,
+            typer.Option("--no-env-file", help="Disable dotenv loading and .env initialization"),
+        ] = False,
     ) -> None:
+        try:
+            prepare(
+                env_file=env_file,
+                no_env_file=no_env_file,
+                baseline=dotenv_baseline(),
+            )
+        except DotenvError as exc:
+            _fail({"error": {"code": "dotenv_error", "message": str(exc)}})
         ctx.obj = {
             "client": RestClient(
-                url,
-                token,
+                url if url is not None else os.environ.get("OPAL_YOLO_URL"),
+                token if token is not None else os.environ.get("OPAL_YOLO_TOKEN"),
                 transport=transport,
                 service_app=service_app,
             )
         }
+
+    @app.command("serve")
+    def serve(
+        host: str | None = typer.Option(None, "--host", help="Bind host"),
+        port: int | None = typer.Option(None, "--port", min=1, max=65535, help="Bind port"),
+    ) -> None:
+        import uvicorn
+
+        settings = Settings()
+        if host is not None:
+            settings.host = host
+        if port is not None:
+            settings.port = port
+        uvicorn.run(create_app(settings=settings), host=settings.host, port=settings.port)
 
     @info_app.command("show")
     def info_show(ctx: typer.Context) -> None:

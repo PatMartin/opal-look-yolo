@@ -12,7 +12,7 @@ from opal_look_yolo import __version__
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="OPAL_YOLO_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="OPAL_YOLO_", extra="ignore")
 
     service_name: str = "opal-yolo"
     service_version: str = __version__
@@ -69,3 +69,19 @@ class Settings(BaseSettings):
             return ipaddress.ip_address(host).is_loopback
         except ValueError:
             return False
+
+
+def dotenv_baseline() -> dict[str, object]:
+    defaults = Settings.model_construct()
+    return {
+        "OPAL_YOLO_HOST": defaults.host,
+        "OPAL_YOLO_PORT": defaults.port,
+        "OPAL_YOLO_AUTH_DISABLED": defaults.auth_disabled,
+        "OPAL_YOLO_MODEL_DIRS": json.dumps([str(path) for path in defaults.model_dirs]),
+        "OPAL_YOLO_MAX_IMAGE_BYTES": defaults.max_image_bytes,
+        "OPAL_YOLO_MAX_CONCURRENT_PREDICTIONS": defaults.max_concurrent_predictions,
+        "OPAL_YOLO_ALLOW_REMOTE_SOURCES": defaults.allow_remote_sources,
+        "OPAL_YOLO_ALLOWED_REMOTE_HOSTS": json.dumps(defaults.allowed_remote_hosts),
+        "OPAL_YOLO_REMOTE_SOURCE_TIMEOUT_SECONDS": defaults.remote_source_timeout_seconds,
+        "OPAL_YOLO_AUTH_TOKEN": "<set-a-token>",
+    }

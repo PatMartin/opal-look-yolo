@@ -121,3 +121,7 @@ At final verification: `81 passed`; Ruff and OpenAPI validation pass.
 - GPU discovery uses optional Torch integration and otherwise reports a CPU fallback.
 - The SPA is intentionally minimal and does not provide a multipart frame upload form.
 - `openapi/shared/opal_kernel.yaml` is used as a convention reference; the service contract defines its components locally and does not externally `$ref` the shared file.
+
+## Dotenv configuration
+
+See [docs/DOTENV.md](docs/DOTENV.md) for `.env` loading, initialization, precedence, and `--env-file` / `--no-env-file` behavior.
