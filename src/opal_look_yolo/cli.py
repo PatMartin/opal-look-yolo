@@ -30,7 +30,7 @@ class RestClient:
         self.base_url = (base_url or EMBEDDED_BASE_URL).rstrip("/")
         self.transport = transport
         self.service_app = service_app
-        self.embedded = base_url is None and transport is None
+        self.embedded = not base_url and transport is None
 
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
         headers = dict(kwargs.pop("headers", {}))

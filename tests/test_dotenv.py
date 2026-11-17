@@ -106,6 +106,15 @@ def test_cli_dotenv_controls(tmp_path, monkeypatch):
     assert "dotenv file not found" in result.output
 
 
+def test_empty_url_environment_selects_embedded_mode(tmp_path, monkeypatch):
+    runner = CliRunner()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPAL_YOLO_URL", "")
+    (tmp_path / ".env").write_text("OPAL_YOLO_URL='http://127.0.0.1:1'\n")
+    result = runner.invoke(create_cli_app(), ["info", "health"])
+    assert result.exit_code == 0
+
+
 def test_yolo_baseline_contains_supported_defaults():
     baseline = dotenv_baseline()
     assert baseline["OPAL_YOLO_PORT"] == 8086
