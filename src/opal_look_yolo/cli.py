@@ -112,6 +112,7 @@ def _json_object(raw: str | None, name: str) -> dict[str, Any]:
 def create_cli_app(
     transport: httpx.AsyncBaseTransport | None = None,
     service_app: FastAPI | None = None,
+    label: str = "opal-yolo",
 ) -> typer.Typer:
     app = typer.Typer(no_args_is_help=True, help="OPAL Look YOLO REST API client")
     info_app = typer.Typer(no_args_is_help=True, help="Service information")
@@ -260,12 +261,17 @@ def create_cli_app(
     app.add_typer(engines_app, name="engines")
     app.add_typer(models_app, name="models")
     app.add_typer(hardware_app, name="hardware")
-    register_tree_commands(app, "opal-yolo")
+    register_tree_commands(app, label)
     return app
 
 
 app = create_cli_app()
+yolo_look_app = create_cli_app(label="yolo-look")
 
 
 def main() -> None:
     app()
+
+
+def main_yolo_look() -> None:
+    yolo_look_app()

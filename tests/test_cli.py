@@ -199,3 +199,10 @@ def test_embedded_asgi_is_the_default_mode():
         "status": "ok",
         "engine_available": True,
     }
+
+
+def test_yolo_look_alias_renders_its_own_tree_root():
+    result = CliRunner().invoke(create_cli_app(label="yolo-look"), ["tree", "--ascii"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.splitlines()[0].startswith("yolo-look")

@@ -24,6 +24,7 @@ dependencies = [
 
 [project.scripts]
 opal-yolo = "opal_look_yolo.cli:main"
+yolo-look = "opal_look_yolo.cli:main_yolo_look"
 
 [project.optional-dependencies]
 dev = [

@@ -1,7 +1,8 @@
 # OPAL Look YOLO CLI
 
-`opal-yolo` is the command-line client for the OPAL Look YOLO adapter. It is a
-Typer application whose commands use the REST contract's paths, schemas, and
+`opal-yolo` is the command-line client for the OPAL Look YOLO adapter. It can
+also be invoked as `yolo-look`; both executable names expose the same Typer
+application. Commands use the REST contract's paths, schemas, and
 error semantics. By default, each command creates the FastAPI application in the
 CLI process and sends the request through `httpx.ASGITransport`; no TCP listener
 or separate service process is required. Supplying `--url` or
@@ -28,6 +29,8 @@ Verify the entry point:
 ```bash
 opal-yolo --help
 opal-yolo tree
+# Equivalent alias:
+yolo-look tree
 ```
 
 ## Global configuration

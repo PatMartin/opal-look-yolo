@@ -46,9 +46,10 @@ Then open `http://127.0.0.1:8086/app/` for the SPA. `/` redirects to the SPA.
 
 ## CLI
 
-The installed `opal-yolo` command uses the public REST contract. It runs the
-FastAPI application through in-process ASGI by default, so no listener is
-required. See `docs/CLI.md` for the complete guide.
+The installed `opal-yolo` command, also available as `yolo-look`, uses the
+public REST contract. It runs the FastAPI application through in-process ASGI
+by default, so no listener is required. See `docs/CLI.md` for the complete
+guide.
 
 ```bash
 opal-yolo info show
