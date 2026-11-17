@@ -216,9 +216,8 @@ opal-look's stream/SSE documentation for the event surface.
 Settings use the `OPAL_YOLO_` prefix. Precedence, highest to lowest:
 **CLI arguments → existing environment variables (including empty
 strings) → `.env` entries → built-in defaults.** `./.env` is loaded (and
-created from defaults when missing) at startup — see
-[docs/DOTENV.md](docs/DOTENV.md) for the full policy, `--env-file`, and
-`--no-env-file`.
+created from defaults when missing) at startup; `--env-file PATH` points
+the CLI at another file and `--no-env-file` disables loading entirely.
 
 | Setting | Default | Purpose |
 |---|---|---|
@@ -271,8 +270,10 @@ format for the installed `ultralytics` version, then retry
 
 - [docs/CLI.md](docs/CLI.md) — complete CLI reference and a 20-recipe
   cookbook (`yolo-look tree` prints the live command tree).
-- [docs/DOTENV.md](docs/DOTENV.md) — `.env` loading, initialization,
-  precedence, and embedded/subprocess behavior.
+- [docs/COOKBOOK.md](docs/COOKBOOK.md) — the OPAL ecosystem cookbook:
+  170 recipes across every service, including this adapter.
+- [.env.example](.env.example) — every supported setting with safe
+  placeholders.
 - [openapi/opal_look_yolo.yaml](openapi/opal_look_yolo.yaml) — the
   authoritative REST contract (14 operations; generated schema is
   reconciled against it in tests).
