@@ -39,7 +39,7 @@ Global options must appear before the command group or command:
 
 ```bash
 opal-yolo info health
-opal-yolo --url http://127.0.0.1:8086 --token "$TOKEN" info show
+opal-yolo --url http://127.0.0.1:8086 --token "$TOKEN" info health
 ```
 
 | Option | Environment variable | Default | Purpose |
@@ -137,11 +137,10 @@ status `2`.
 opal-yolo [--url] [--token]
 ├── predict source --model-id [--confidence] [--device] [--engine-options]
 │   [--include-native]
-├── predict-frame --image --frame --model-id [--confidence] [--device]
-│   [--engine-options] [--include-native]
+│   └── frame --image --frame --model-id [--confidence] [--device]
+│       [--engine-options] [--include-native]
 ├── tree [--ascii]
 ├── info
-│   ├── show
 │   └── health
 ├── engines
 │   ├── list
@@ -153,10 +152,27 @@ opal-yolo [--url] [--token]
 │   ├── show model_id
 │   ├── load model_id [--device]
 │   └── unload model_id
-└── hardware
-    ├── list
-    └── show device_id
+├── hardware
+│   ├── list
+│   └── show device_id
+├── config
+│   ├── setting  list · show · set · remove
+│   ├── save [--out]
+│   ├── load [--in]
+│   └── validate [--in]
+├── profile
+│   ├── list · show · add · update · remove · activate
+├── persona
+│   ├── list · add · show · update · remove · validate
+└── service
+    ├── start [--append] [--host] [--port] [--data-dir]
+    ├── stop
+    └── log [--lines]
 ```
+
+`predict` is both a command and a group: `predict SOURCE ...` submits a JSON
+prediction and `predict frame ...` submits a multipart frame (the old
+`predict-frame` spelling is retired).
 
 The `tree` output is generated from the live Typer/Click application, so it
 reflects the installed CLI rather than a hand-maintained command list.
@@ -171,12 +187,12 @@ the embedded FastAPI application or contact a remote service.
 Service metadata and readiness.
 
 ```bash
-opal-yolo info show
 opal-yolo info health
 ```
 
-- `show` calls `GET /api/v1/info/`.
-- `health` calls `GET /api/v1/health/`.
+- `health` calls `GET /api/v1/health/` and returns the kernel
+  `OpalHealthReport` (service name/version plus `details.engine_available`).
+  The retired `info show`/`GET /api/v1/info/` surface is gone in v0.1.0.
 
 ### `engines`
 
@@ -249,12 +265,12 @@ Allowed names and value constraints are defined by `engines capabilities`.
 `--include-native` asks the engine to return sanitized engine-native output in
 addition to normalized detections.
 
-### `predict-frame`
+### `predict frame`
 
 Submit one JPEG or PNG frame plus a frame metadata envelope.
 
 ```bash
-opal-yolo predict-frame \
+opal-yolo predict frame \
   --image frame.png \
   --model-id MODEL_ID \
   --frame FRAME_JSON \
@@ -334,7 +350,7 @@ loopback development without authentication, omit the token.
 ### Recipe 1 — Show adapter metadata
 
 ```bash
-opal-yolo info show
+opal-yolo info health
 ```
 
 Expected output contains `name`, `version`, and `engine_id`.
@@ -353,7 +369,7 @@ reported as JSON with a nonzero exit code.
 ```bash
 export OPAL_YOLO_URL=http://127.0.0.1:8086
 export OPAL_YOLO_TOKEN='local-token'
-opal-yolo info show
+opal-yolo info health
 ```
 
 PowerShell equivalent:
@@ -361,7 +377,7 @@ PowerShell equivalent:
 ```powershell
 $env:OPAL_YOLO_URL = 'http://127.0.0.1:8086'
 $env:OPAL_YOLO_TOKEN = 'local-token'
-opal-yolo info show
+opal-yolo info health
 ```
 
 ### Recipe 4 — Print the complete CLI tree
@@ -439,7 +455,7 @@ opal-yolo models list
 ```
 
 Use the `model_id` value in subsequent `show`, `load`, `unload`, `predict`, and
-`predict-frame` commands.
+`predict frame` commands.
 
 ### Recipe 13 — Inspect one model
 
@@ -513,7 +529,7 @@ advertised capability schema.
 ### Recipe 20 — Submit one frame envelope for prediction
 
 ```bash
-opal-yolo predict-frame \
+opal-yolo predict frame \
   --image ./frames/00042.png \
   --model-id yolov8n \
   --confidence 0.3 \

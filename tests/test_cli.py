@@ -107,7 +107,8 @@ def test_predict_frame_sends_multipart_frame(tmp_path):
 
     result = invoke(
         [
-            "predict-frame",
+            "predict",
+            "frame",
             "--image",
             str(image),
             "--frame",
@@ -158,11 +159,15 @@ def test_tree_renders_live_command_tree():
         "models",
         "hardware",
         "predict",
-        "predict-frame",
+        "config",
+        "profile",
+        "persona",
+        "service",
         "tree",
     ):
         assert command in output
-    assert "source" in output
+    assert "predict-frame" not in output
+    assert "frame" in output
     assert "[--model-id]" not in output
     assert "--model-id" in output
     assert "--help" not in output

@@ -36,6 +36,12 @@
   <section>
     <h2>Service</h2>
     <div id="service">Loading…</div>
+    <div class="grid" style="margin-top:.75rem">
+      <label>&nbsp;<button id="svc-start">Start / restart</button></label>
+      <label>&nbsp;<button id="svc-stop">Stop</button></label>
+      <label>Log lines <input id="svc-lines" type="number" min="1" max="1000" value="10"></label>
+      <label>&nbsp;<button id="svc-log">Tail log</button></label>
+    </div>
   </section>
   <section>
     <h2>Engines</h2><div id="engines"></div>
@@ -43,6 +49,23 @@
   </section>
   <section>
     <h2>Models</h2><div id="models"></div>
+  </section>
+  <section>
+    <h2>Settings</h2><div id="settings"></div>
+  </section>
+  <section>
+    <h2>Profiles</h2><div id="profiles"></div>
+  </section>
+  <section>
+    <h2>Personas</h2><div id="personas"></div>
+  </section>
+  <section>
+    <h2>Configuration</h2>
+    <div class="grid">
+      <label>&nbsp;<button id="cfg-save">Save managed snapshot</button></label>
+      <label>&nbsp;<button id="cfg-load">Load managed snapshot</button></label>
+      <label>&nbsp;<button id="cfg-validate">Validate live config</button></label>
+    </div>
   </section>
   <section>
     <h2>JSON prediction</h2>
@@ -73,7 +96,13 @@ async function request(path, options = {}) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw data.error || {message: `HTTP ${response.status}`};
-  return data;
+  return {data, etag: response.headers.get('ETag')};
+}
+async function mutate(method, path, body) {
+  const {etag} = await request('/setting/');
+  const options = {method, headers: {'If-Match': etag}};
+  if (body !== undefined) options.body = JSON.stringify(body);
+  return (await request(path, options)).data;
 }
 function show(data, failed = false) {
   result.className = failed ? 'error' : 'ok';
@@ -87,12 +116,14 @@ function rows(items, columns) {
 }
 async function refresh() {
   try {
-    const [health, engines, hardware, models] = await Promise.all([
-      request('/health/'), request('/engine/'),
-      request('/hardware/'), request('/model/')
-    ]);
+    const [health, engines, hardware, models, settings, profiles, personas] =
+      (await Promise.all([
+        request('/health/'), request('/engine/'), request('/hardware/'),
+        request('/model/'), request('/setting/'), request('/profile/'),
+        request('/persona/')
+      ])).map(r => r.data);
     document.querySelector('#service').innerHTML =
-      `<p><strong>${health.name}</strong> ${health.version} — <span class="ok">${health.status}</span> (ready: ${health.ready})</p>`;
+      `<p><strong>${health.name}</strong> ${health.version} — <span class="ok">${health.status}</span> (ready: ${health.ready}, active profile: ${health.active_profile_id ?? 'none'})</p>`;
     document.querySelector('#engines').innerHTML = rows(engines, [
       ['ID', e => e.engine_id], ['Name', e => e.name], ['Version', e => e.version],
       ['Available', e => e.available]
@@ -107,6 +138,22 @@ async function refresh() {
       ['', m => `<button onclick="loadModel('${m.model_id}')">Load</button>
         <button onclick="unloadModel('${m.model_id}')">Unload</button>`]
     ]);
+    document.querySelector('#settings').innerHTML = rows(settings, [
+      ['Key', s => s.key], ['Value', s => JSON.stringify(s.value)],
+      ['Source', s => s.source], ['Override', s => s.has_override],
+      ['', s => `<button onclick="resetSetting('${s.key}')">Reset</button>`]
+    ]);
+    document.querySelector('#profiles').innerHTML = rows(profiles, [
+      ['ID', p => p.id], ['Name', p => p.name], ['Active', p => p.is_active],
+      ['Modules', p => Object.keys(p.modules || {}).join(', ')],
+      ['', p => p.is_active ? '' :
+        `<button onclick="activateProfile('${p.id}')">Activate</button>`]
+    ]);
+    document.querySelector('#personas').innerHTML = rows(personas, [
+      ['ID', p => p.persona_id], ['Name', p => p.name],
+      ['Enabled', p => p.enabled], ['Voice', p => p.voice_id],
+      ['', p => `<button onclick="validatePersona('${p.persona_id}')">Validate</button>`]
+    ]);
     if (models.length && !document.querySelector('#model-id').value) {
       document.querySelector('#model-id').value = models[0].model_id;
     }
@@ -114,29 +161,66 @@ async function refresh() {
   } catch (error) { show(error, true); }
 }
 window.loadModel = async id => {
-  try { show(await request(`/model/${id}/load`, {method: 'POST', body: '{}'})); refresh(); }
+  try { show((await request(`/model/${id}/load`, {method: 'POST', body: '{}'})).data); refresh(); }
   catch (error) { show(error, true); }
 };
 window.unloadModel = async id => {
-  try { show(await request(`/model/${id}/unload`, {method: 'POST', body: '{}'})); refresh(); }
+  try { show((await request(`/model/${id}/unload`, {method: 'POST', body: '{}'})).data); refresh(); }
+  catch (error) { show(error, true); }
+};
+window.resetSetting = async key => {
+  try { await mutate('DELETE', `/setting/${key}`); refresh(); }
+  catch (error) { show(error, true); }
+};
+window.activateProfile = async id => {
+  try { show(await mutate('POST', `/profile/${id}/activate`)); refresh(); }
+  catch (error) { show(error, true); }
+};
+window.validatePersona = async id => {
+  try { show((await request(`/persona/${id}/validate`, {method: 'POST', body: '{}'})).data); }
   catch (error) { show(error, true); }
 };
 document.querySelector('#save-token').onclick = () => {
   localStorage.setItem('opal-yolo-token', tokenInput.value.trim()); refresh();
 };
 document.querySelector('#refresh').onclick = refresh;
+document.querySelector('#svc-start').onclick = async () => {
+  try { show((await request('/service/start', {method: 'POST', body: '{}'})).data); }
+  catch (error) { show(error, true); }
+};
+document.querySelector('#svc-stop').onclick = async () => {
+  try { show((await request('/service/stop', {method: 'POST', body: '{}'})).data); }
+  catch (error) { show(error, true); }
+};
+document.querySelector('#svc-log').onclick = async () => {
+  const lines = Number(document.querySelector('#svc-lines').value) || 10;
+  try { show((await request(`/service/log?lines=${lines}`)).data); }
+  catch (error) { show(error, true); }
+};
+document.querySelector('#cfg-save').onclick = async () => {
+  try { show((await request('/config/save', {method: 'POST', body: '{"destination":"managed"}'})).data); }
+  catch (error) { show(error, true); }
+};
+document.querySelector('#cfg-load').onclick = async () => {
+  try { show(await mutate('POST', '/config/load', {})); refresh(); }
+  catch (error) { show(error, true); }
+};
+document.querySelector('#cfg-validate').onclick = async () => {
+  try { show((await request('/config/validate', {method: 'POST', body: '{}'})).data); }
+  catch (error) { show(error, true); }
+};
 document.querySelector('#predict').onclick = async () => {
   let options;
   try { options = JSON.parse(document.querySelector('#engine-options').value || '{}'); }
   catch { return show({error: {code: 'validation_failed', message: 'Engine options must be JSON'}}, true); }
   try {
-    show(await request('/predict', {method: 'POST', body: JSON.stringify({
+    show((await request('/predict', {method: 'POST', body: JSON.stringify({
       engine: 'yolo', model_id: document.querySelector('#model-id').value,
       source: document.querySelector('#source').value,
       confidence: Number(document.querySelector('#confidence').value),
       device: document.querySelector('#device').value || null,
       engine_options: options, include_native: false
-    })}));
+    })})).data);
   } catch (error) { show(error, true); }
 };
 refresh();

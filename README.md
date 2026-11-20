@@ -159,7 +159,7 @@ In a second terminal:
 
 ```bash
 yolo-look --url http://127.0.0.1:8086 info health
-# {"engine_available": true, "status": "ok"}
+# {"status": "ok", "ready": true, "details": {"engine_available": true}, ...}
 ```
 
 Open `http://127.0.0.1:8086/app/` for the operations console. Stop the
@@ -173,7 +173,7 @@ caller — bytes are uploaded with the request instead of read from disk,
 and caller frame metadata is echoed back for correlation.
 
 ```bash
-yolo-look predict-frame --image frame.png --model-id yolo26n \
+yolo-look predict frame --image frame.png --model-id yolo26n \
   --frame '{"stream_id":"cam-1","frame_id":"f-42","sequence":42,
             "captured_at":"2026-11-17T12:00:00Z",
             "image":{"width":640,"height":480}}'
@@ -274,8 +274,8 @@ format for the installed `ultralytics` version, then retry
   170 recipes across every service, including this adapter.
 - [.env.example](.env.example) — every supported setting with safe
   placeholders.
-- [openapi/opal_look_yolo.yaml](openapi/opal_look_yolo.yaml) — the
-  authoritative REST contract (14 operations; generated schema is
+- [openapi/engines/opal_look_yolo.yaml](openapi/engines/opal_look_yolo.yaml) — the
+  authoritative REST contract (v0.1.0; generated schema is
   reconciled against it in tests).
 - `docs/YOLO_INSTALL.md` in
   [opal-look](https://github.com/PatMartin/opal-look) — using this

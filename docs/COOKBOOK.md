@@ -157,8 +157,8 @@ opal-device                  device registry client (REST :8080)
 └── service                  start · stop · log
 
 yolo-look                    YOLO adapter (REST :8086, embedded ASGI without --url)
-├── serve · predict · predict-frame · tree
-├── info                     show · health
+├── serve · predict · predict frame · tree
+├── info                     health
 ├── engines                  list · discover · show · capabilities
 ├── models                   list · show · load · unload
 └── hardware                 list · show
