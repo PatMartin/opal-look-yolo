@@ -127,4 +127,14 @@ def create_app(
     return app
 
 
-app = create_app()
+_app: FastAPI | None = None
+
+
+async def app(scope, receive, send) -> None:
+    """ASGI entrypoint (`uvicorn opal_look_yolo.main:app`); the app — and
+    its persistent store — is created on first request so importing this
+    module has no filesystem side effect."""
+    global _app
+    if _app is None:
+        _app = create_app()
+    await _app(scope, receive, send)

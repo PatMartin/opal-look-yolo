@@ -6,6 +6,7 @@ import yaml
 from openapi_spec_validator import validate
 
 from opal_look_yolo.main import create_app
+from opal_look_yolo.store import Store
 
 SPEC_PATH = Path("openapi/engines/opal_look_yolo.yaml")
 
@@ -49,7 +50,7 @@ def test_source_contract_is_valid_openapi():
 
 
 def test_application_schema_covers_implemented_contract_operations():
-    generated = create_app().openapi()
+    generated = create_app(store=Store()).openapi()
     generated_paths = {
         (method.upper(), path): operation
         for path, item in generated["paths"].items()
@@ -75,7 +76,7 @@ def test_generated_surface_matches_target_minus_pending():
     operation is served (tracked pending ops are explicitly listed)."""
     generated_paths = {
         (method.upper(), path)
-        for path, item in create_app().openapi()["paths"].items()
+        for path, item in create_app(store=Store()).openapi()["paths"].items()
         for method in item
     }
 

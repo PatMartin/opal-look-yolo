@@ -24,32 +24,45 @@ from .repositories import (
 
 
 class _LockedConnection:
-    """Serializes statement execution across threads.
+    """Serializes statement execution across threads and opens the real
+    connection lazily.
 
     A single sqlite3 connection is not safe for concurrent use even with
     check_same_thread=False. write_txn() holds the same re-entrant lock
     for its whole transaction so statements issued inside it pass
-    through while other threads wait.
+    through while other threads wait. The underlying connection (and its
+    data directory) is created on first use, so constructing a Store —
+    e.g. the module-level ASGI app — has no filesystem side effect.
     """
 
-    def __init__(self, conn: sqlite3.Connection, lock: threading.RLock) -> None:
-        self._conn = conn
+    def __init__(self, factory, lock: threading.RLock) -> None:
+        self._factory = factory
+        self._conn: sqlite3.Connection | None = None
         self._lock = lock
+
+    def _resolve(self) -> sqlite3.Connection:
+        if self._conn is None:
+            self._conn = self._factory()
+        return self._conn
 
     def execute(self, *args, **kwargs):
         with self._lock:
-            return self._conn.execute(*args, **kwargs)
+            return self._resolve().execute(*args, **kwargs)
 
     def executemany(self, *args, **kwargs):
         with self._lock:
-            return self._conn.executemany(*args, **kwargs)
+            return self._resolve().executemany(*args, **kwargs)
 
     def executescript(self, *args, **kwargs):
         with self._lock:
-            return self._conn.executescript(*args, **kwargs)
+            return self._resolve().executescript(*args, **kwargs)
+
+    def close(self) -> None:
+        if self._conn is not None:
+            self._conn.close()
 
     def __getattr__(self, name: str):
-        return getattr(self._conn, name)
+        return getattr(self._resolve(), name)
 
 
 class Store:
@@ -58,30 +71,37 @@ class Store:
 
     def __init__(self, data_dir: Path | str | None = None) -> None:
         if data_dir is None:
-            raw = sqlite3.connect(":memory:", check_same_thread=False, isolation_level=None)
             self.data_dir = None
             self.db_path = None
         else:
             self.data_dir = Path(data_dir)
-            self.data_dir.mkdir(parents=True, exist_ok=True)
             self.db_path = self.data_dir / "opal-look-yolo.db"
-            raw = sqlite3.connect(
-                self.db_path, check_same_thread=False, isolation_level=None
-            )
-        raw.row_factory = sqlite3.Row
-        raw.execute("PRAGMA journal_mode=WAL")
         self._lock = threading.RLock()
         self._txn_state = threading.local()
-        self._conn = _LockedConnection(raw, self._lock)
-        self._init_schema()
+        self._conn = _LockedConnection(self._open, self._lock)
 
         self.meta = SqliteMetaRepository(self._conn)
         self.settings = SqliteSettingsRepository(self._conn)
         self.profiles = SqliteProfileRepository(self._conn)
         self.personas = SqlitePersonaRepository(self._conn)
 
-    def _init_schema(self) -> None:
-        self._conn.executescript(
+    def _open(self) -> sqlite3.Connection:
+        """Create the data directory (when on-disk) + schema on first use."""
+        if self.db_path is None:
+            raw = sqlite3.connect(
+                ":memory:", check_same_thread=False, isolation_level=None)
+        else:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            raw = sqlite3.connect(
+                self.db_path, check_same_thread=False, isolation_level=None
+            )
+        raw.row_factory = sqlite3.Row
+        raw.execute("PRAGMA journal_mode=WAL")
+        self._init_schema(raw)
+        return raw
+
+    def _init_schema(self, conn: sqlite3.Connection) -> None:
+        conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS meta (
                 key TEXT PRIMARY KEY,
@@ -114,10 +134,10 @@ class Store:
             );
             """
         )
-        if self._conn.execute(
+        if conn.execute(
             "SELECT value FROM meta WHERE key = 'config_revision'"
         ).fetchone() is None:
-            self._conn.execute(
+            conn.execute(
                 "INSERT INTO meta (key, value) VALUES ('config_revision', ?)",
                 (new_revision(),),
             )
