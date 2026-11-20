@@ -12,9 +12,6 @@ SPEC_PATH = Path("openapi/engines/opal_look_yolo.yaml")
 # Target operations not yet implemented. Shrinks as migration steps land;
 # must be empty at completion. Tracked per (METHOD, path).
 PENDING_OPERATIONS = {
-    ("POST", "/api/v1/config/save"),
-    ("POST", "/api/v1/config/load"),
-    ("POST", "/api/v1/config/validate"),
     ("POST", "/api/v1/service/start"),
     ("POST", "/api/v1/service/stop"),
     ("GET", "/api/v1/service/log"),
