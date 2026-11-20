@@ -11,5 +11,7 @@ dist/
 .env
 resources/
 runs/
+data/
+logs/
 !.env.example
 .vscode/

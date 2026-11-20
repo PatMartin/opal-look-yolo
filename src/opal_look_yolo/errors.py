@@ -10,6 +10,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
+from opal_look_yolo.middleware.correlation import (
+    CorrelationIds,
+    current_ids,
+    envelope,
+)
+
 logger = logging.getLogger(__name__)
 
 _STATUS_CODES: Mapping[int, str] = {
@@ -28,6 +34,9 @@ _STATUS_CODES: Mapping[int, str] = {
     status.HTTP_503_SERVICE_UNAVAILABLE: "service_unavailable",
 }
 
+# Transient statuses: the client may retry the same request later.
+_RETRYABLE_STATUSES = frozenset({429, 503})
+
 
 class OpalException(Exception):
     def __init__(
@@ -36,12 +45,17 @@ class OpalException(Exception):
         code: str,
         message: str,
         details: dict[str, Any] | None = None,
+        *,
+        retryable: bool | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
         self.details = details
+        self.retryable = retryable
+        self.headers = headers
 
 
 def opal_error_response(
@@ -50,46 +64,84 @@ def opal_error_response(
     message: str,
     details: dict[str, Any] | None = None,
 ) -> JSONResponse:
-    error: dict[str, Any] = {"code": code, "message": message}
-    if details is not None:
-        error["details"] = details
-    return JSONResponse(status_code=status_code, content={"error": error})
+    return JSONResponse(
+        status_code=status_code,
+        content=envelope(current_ids(), code=code, message=message, details=details),
+    )
 
 
 def _default_code(status_code: int) -> str:
     return _STATUS_CODES.get(status_code, "request_failed")
 
 
-async def opal_exception_handler(_: Request, exc: OpalException) -> JSONResponse:
-    return opal_error_response(exc.status_code, exc.code, exc.message, exc.details)
+def _ids_for(request: Request) -> CorrelationIds:
+    ids = getattr(request.state, "opal_correlation", None)
+    return ids if ids is not None else current_ids()
 
 
-async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+def _retryable_for(status_code: int) -> bool | None:
+    return True if status_code in _RETRYABLE_STATUSES else None
+
+
+async def opal_exception_handler(request: Request, exc: OpalException) -> JSONResponse:
+    retryable = exc.retryable if exc.retryable is not None else _retryable_for(exc.status_code)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=envelope(
+            _ids_for(request),
+            code=exc.code,
+            message=exc.message,
+            details=exc.details,
+            retryable=retryable,
+        ),
+        headers=exc.headers,
+    )
+
+
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     message = exc.detail if isinstance(exc.detail, str) else "Request failed"
     details = None if isinstance(exc.detail, str) else {"detail": exc.detail}
-    return opal_error_response(exc.status_code, _default_code(exc.status_code), message, details)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=envelope(
+            _ids_for(request),
+            code=_default_code(exc.status_code),
+            message=message,
+            details=details,
+            retryable=_retryable_for(exc.status_code),
+        ),
+        headers=getattr(exc, "headers", None),
+    )
 
 
-async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     errors = jsonable_encoder(exc.errors())
     malformed = any(error.get("type") == "json_invalid" for error in errors)
     status_code = (
         status.HTTP_400_BAD_REQUEST if malformed else status.HTTP_422_UNPROCESSABLE_CONTENT
     )
-    return opal_error_response(
-        status_code,
-        _default_code(status_code),
-        "Malformed request body" if malformed else "Request validation failed",
-        {"errors": errors},
+    return JSONResponse(
+        status_code=status_code,
+        content=envelope(
+            _ids_for(request),
+            code=_default_code(status_code),
+            message="Malformed request body" if malformed else "Request validation failed",
+            details={"errors": errors},
+        ),
     )
 
 
-async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled request failure", exc_info=exc)
-    return opal_error_response(
-        status.HTTP_500_INTERNAL_SERVER_ERROR,
-        "internal_error",
-        "Unexpected internal failure",
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=envelope(
+            _ids_for(request),
+            code="internal_error",
+            message="Unexpected internal failure",
+        ),
     )
 
 

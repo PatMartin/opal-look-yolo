@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from opal_look_yolo.services.hardware import (
 from opal_look_yolo.services.models import ModelService
 from opal_look_yolo.services.prediction import PredictionService
 from opal_look_yolo.services.sources import ImageSourceResolver
+from opal_look_yolo.store import Store
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -39,6 +41,7 @@ def create_app(
     hardware_provider: HardwareProvider | None = None,
     model_repository: ModelRepository | None = None,
     model_runtime: ModelRuntime | None = None,
+    store: Store | None = None,
 ) -> FastAPI:
     resolved_settings = settings or Settings()
     app = FastAPI(
@@ -53,6 +56,8 @@ def create_app(
     resolved_runtime = model_runtime or EngineModelRuntime.from_registry(resolved_registry)
 
     app.state.settings = resolved_settings
+    app.state.store = store or Store(resolved_settings.data_dir)
+    app.state.started_monotonic = time.monotonic()
     app.state.engine_registry = resolved_registry
     app.state.hardware_service = resolved_hardware
     resolved_model_service = ModelService(

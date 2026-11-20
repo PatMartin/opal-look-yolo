@@ -10,6 +10,7 @@ from opal_look_yolo.engines import EngineRegistry
 from opal_look_yolo.main import create_app
 from opal_look_yolo.models import ModelRepository, ModelRuntime
 from opal_look_yolo.services.hardware import HardwareProvider
+from opal_look_yolo.store import Store
 
 
 @pytest.fixture
@@ -24,6 +25,7 @@ def make_client() -> Callable[..., TestClient]:
         model_repository: ModelRepository | None = None,
         model_runtime: ModelRuntime | None = None,
         service_settings: Settings | None = None,
+        store: Store | None = None,
     ) -> TestClient:
         settings = service_settings or Settings(
             auth_disabled=auth_disabled,
@@ -36,6 +38,7 @@ def make_client() -> Callable[..., TestClient]:
             hardware_provider=hardware_provider,
             model_repository=model_repository,
             model_runtime=model_runtime,
+            store=store or Store(),
         )
         return TestClient(app)
 

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     engine_id: str = "yolo"
     host: str = "127.0.0.1"
     port: int = Field(default=8086, ge=1, le=65535)
+    data_dir: Path = Path("data")
     auth_disabled: bool = True
     auth_token: str | None = None
     model_dirs: Annotated[list[Path], NoDecode] = Field(default_factory=lambda: [Path("models")])

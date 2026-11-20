@@ -21,7 +21,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             request.method,
             request.url.path,
             response.status_code,
-            getattr(request.state, "opal_request_id", "-"),
+            getattr(
+                getattr(request.state, "opal_correlation", None), "request_id", "-"
+            ),
             duration_ms,
         )
         return response
