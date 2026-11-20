@@ -4,6 +4,7 @@ import time
 
 from fastapi import APIRouter, Request, status
 
+from opal_look_yolo.portable_settings import pending_restart_fields
 from opal_look_yolo.schemas.common import HealthReport, OpalError
 from opal_look_yolo.timeutil import now_iso
 
@@ -52,6 +53,9 @@ async def show_health(request: Request) -> HealthReport:
     settings = request.app.state.settings
     started = getattr(request.app.state, "started_monotonic", None)
     uptime = (time.monotonic() - started) if started is not None else 0.0
+    pending_fields = pending_restart_fields(
+        store, request.app.state.running_settings
+    )
     return HealthReport(
         name=SERVICE_NAME,
         version=settings.service_version,
@@ -63,6 +67,6 @@ async def show_health(request: Request) -> HealthReport:
         active_profile_id=str(active["profile_id"]) if active is not None else None,
         checked_at=now_iso(),
         uptime_seconds=max(0.0, uptime),
-        pending_restart=False,
-        pending_restart_fields=[],
+        pending_restart=bool(pending_fields),
+        pending_restart_fields=pending_fields,
     )

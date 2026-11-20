@@ -8,7 +8,16 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from opal_look_yolo.api.routes import engines, hardware, health, models, predict
+from opal_look_yolo.api.routes import (
+    engines,
+    hardware,
+    health,
+    models,
+    predict,
+)
+from opal_look_yolo.api.routes import (
+    settings as settings_routes,
+)
 from opal_look_yolo.config import Settings
 from opal_look_yolo.engines import EngineRegistry, UltralyticsYoloEngine
 from opal_look_yolo.errors import register_exception_handlers
@@ -21,6 +30,7 @@ from opal_look_yolo.models import (
     ModelRepository,
     ModelRuntime,
 )
+from opal_look_yolo.portable_settings import apply_persisted_overrides, running_values
 from opal_look_yolo.services.hardware import (
     HardwareProvider,
     HardwareService,
@@ -57,6 +67,8 @@ def create_app(
 
     app.state.settings = resolved_settings
     app.state.store = store or Store(resolved_settings.data_dir)
+    apply_persisted_overrides(app.state.store, resolved_settings)
+    app.state.running_settings = running_values(resolved_settings)
     app.state.started_monotonic = time.monotonic()
     app.state.engine_registry = resolved_registry
     app.state.hardware_service = resolved_hardware
@@ -90,6 +102,7 @@ def create_app(
 
     api = APIRouter(prefix="/api/v1", dependencies=[Depends(require_bearer_auth)])
     api.include_router(health.router)
+    api.include_router(settings_routes.router)
     api.include_router(engines.router)
     api.include_router(hardware.router)
     api.include_router(models.router)
