@@ -26,7 +26,7 @@ def test_spa_is_served_without_api_authentication(make_client):
 def test_spa_does_not_shadow_api_routes(make_client):
     client = make_client()
 
-    response = client.get("/api/v1/info/", headers={"Authorization": "Bearer test-token"})
+    response = client.get("/api/v1/health/", headers={"Authorization": "Bearer test-token"})
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["name"] == "opal-yolo"
+    assert response.json()["name"] == "opal-look-yolo-svc"

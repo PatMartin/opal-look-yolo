@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 
 import pytest
@@ -11,6 +12,17 @@ from opal_look_yolo.main import create_app
 from opal_look_yolo.models import ModelRepository, ModelRuntime
 from opal_look_yolo.services.hardware import HardwareProvider
 from opal_look_yolo.store import Store
+
+
+@pytest.fixture(autouse=True)
+def _isolate_environ():
+    """CLI invokes load ./.env into os.environ; keep tests order-independent."""
+    snapshot = dict(os.environ)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(snapshot)
 
 
 @pytest.fixture

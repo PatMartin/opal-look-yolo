@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from opal_look_yolo.api.routes import engines, hardware, info, models, predict
+from opal_look_yolo.api.routes import engines, hardware, health, models, predict
 from opal_look_yolo.config import Settings
 from opal_look_yolo.engines import EngineRegistry, UltralyticsYoloEngine
 from opal_look_yolo.errors import register_exception_handlers
@@ -89,7 +89,7 @@ def create_app(
     register_exception_handlers(app)
 
     api = APIRouter(prefix="/api/v1", dependencies=[Depends(require_bearer_auth)])
-    api.include_router(info.router)
+    api.include_router(health.router)
     api.include_router(engines.router)
     api.include_router(hardware.router)
     api.include_router(models.router)

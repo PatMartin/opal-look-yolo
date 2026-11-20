@@ -21,18 +21,18 @@ def invoke(arguments, handler):
     )
 
 
-def test_info_show_dispatches_bearer_request():
+def test_info_health_dispatches_bearer_request():
     seen = []
 
     def handler(request):
         seen.append((request.method, str(request.url), request.headers.get("authorization")))
         return httpx.Response(200, json={"service": "opal-yolo"})
 
-    result = invoke(["info", "show"], handler)
+    result = invoke(["info", "health"], handler)
 
     assert result.exit_code == 0
     assert json.loads(result.stdout)["service"] == "opal-yolo"
-    assert seen == [("GET", "http://yolo.test/api/v1/info/", "Bearer secret")]
+    assert seen == [("GET", "http://yolo.test/api/v1/health/", "Bearer secret")]
 
 
 def test_model_load_sends_device_payload():
@@ -185,7 +185,8 @@ def test_tree_ascii_variant():
     output.encode("ascii")
 
 
-def test_embedded_asgi_is_the_default_mode():
+def test_embedded_asgi_is_the_default_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     service = create_app(
         settings=Settings(auth_disabled=True),
         engine_probe=lambda: True,
@@ -195,10 +196,11 @@ def test_embedded_asgi_is_the_default_mode():
     result = CliRunner().invoke(app, ["info", "health"])
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.stdout) == {
-        "status": "ok",
-        "engine_available": True,
-    }
+    body = json.loads(result.stdout)
+    assert body["status"] == "ok"
+    assert body["ready"] is True
+    assert body["details"]["engine_available"] is True
+    assert body["name"] == "opal-look-yolo-svc"
 
 
 def test_yolo_look_alias_renders_its_own_tree_root():

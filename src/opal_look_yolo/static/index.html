@@ -87,12 +87,12 @@ function rows(items, columns) {
 }
 async function refresh() {
   try {
-    const [info, health, engines, hardware, models] = await Promise.all([
-      request('/info/'), request('/health/'), request('/engine/'),
+    const [health, engines, hardware, models] = await Promise.all([
+      request('/health/'), request('/engine/'),
       request('/hardware/'), request('/model/')
     ]);
     document.querySelector('#service').innerHTML =
-      `<p><strong>${info.name}</strong> ${info.version} — <span class="ok">${health.status}</span></p>`;
+      `<p><strong>${health.name}</strong> ${health.version} — <span class="ok">${health.status}</span> (ready: ${health.ready})</p>`;
     document.querySelector('#engines').innerHTML = rows(engines, [
       ['ID', e => e.engine_id], ['Name', e => e.name], ['Version', e => e.version],
       ['Available', e => e.available]
@@ -110,7 +110,7 @@ async function refresh() {
     if (models.length && !document.querySelector('#model-id').value) {
       document.querySelector('#model-id').value = models[0].model_id;
     }
-    show({info, health});
+    show(health);
   } catch (error) { show(error, true); }
 }
 window.loadModel = async id => {

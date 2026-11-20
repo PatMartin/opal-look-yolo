@@ -176,10 +176,6 @@ def create_cli_app(
             settings.port = port
         uvicorn.run(create_app(settings=settings), host=settings.host, port=settings.port)
 
-    @info_app.command("show")
-    def info_show(ctx: typer.Context) -> None:
-        _emit(_client(ctx).request("GET", "/api/v1/info/"))
-
     @info_app.command("health")
     def info_health(ctx: typer.Context) -> None:
         _emit(_client(ctx).request("GET", "/api/v1/health/"))

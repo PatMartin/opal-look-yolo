@@ -123,11 +123,11 @@ def test_request_logging_includes_correlation_id(make_client, caplog):
 
     with caplog.at_level(logging.INFO, logger="opal_look_yolo.requests"):
         response = client.get(
-            "/api/v1/info/",
+            "/api/v1/health/",
             headers={**AUTH, "X-Opal-Request-Id": "request-log-1"},
         )
 
     assert response.status_code == status.HTTP_200_OK
     assert "request-log-1" in caplog.text
     assert "GET" in caplog.text
-    assert "/api/v1/info/" in caplog.text
+    assert "/api/v1/health/" in caplog.text
