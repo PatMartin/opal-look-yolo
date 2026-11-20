@@ -24,12 +24,6 @@ PENDING_OPERATIONS = {
     ("POST", "/api/v1/service/start"),
     ("POST", "/api/v1/service/stop"),
     ("GET", "/api/v1/service/log"),
-    ("GET", "/api/v1/persona/"),
-    ("POST", "/api/v1/persona/"),
-    ("GET", "/api/v1/persona/{persona_id}"),
-    ("PATCH", "/api/v1/persona/{persona_id}"),
-    ("DELETE", "/api/v1/persona/{persona_id}"),
-    ("POST", "/api/v1/persona/{persona_id}/validate"),
 }
 
 

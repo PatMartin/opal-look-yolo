@@ -13,6 +13,7 @@ from opal_look_yolo.api.routes import (
     hardware,
     health,
     models,
+    personas,
     predict,
 )
 from opal_look_yolo.api.routes import (
@@ -103,6 +104,7 @@ def create_app(
     api = APIRouter(prefix="/api/v1", dependencies=[Depends(require_bearer_auth)])
     api.include_router(health.router)
     api.include_router(settings_routes.router)
+    api.include_router(personas.router)
     api.include_router(engines.router)
     api.include_router(hardware.router)
     api.include_router(models.router)
