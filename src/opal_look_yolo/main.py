@@ -19,6 +19,7 @@ from opal_look_yolo.api.routes import (
     personas,
     predict,
     profiles,
+    service,
 )
 from opal_look_yolo.api.routes import (
     settings as settings_routes,
@@ -111,6 +112,7 @@ def create_app(
     api.include_router(personas.router)
     api.include_router(profiles.router)
     api.include_router(config_routes.router)
+    api.include_router(service.router)
     api.include_router(engines.router)
     api.include_router(hardware.router)
     api.include_router(models.router)
